@@ -2,7 +2,7 @@ import numpy as np
 import pygame
 import time
 from stable_baselines3 import PPO  # 引入 PPO
-from envs.maze_env import MazeMasterEnv
+from envs.maze_env_backup import MazeMasterEnv
 
 
 if __name__ == "__main__":

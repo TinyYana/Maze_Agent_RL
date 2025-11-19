@@ -1,5 +1,5 @@
 from stable_baselines3 import PPO
-from envs.maze_env import MazeMasterEnv
+from envs.maze_env_backup import MazeMasterEnv
 
 
 def train():
