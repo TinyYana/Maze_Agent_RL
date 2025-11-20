@@ -9,7 +9,7 @@ def train():
     # 2. 定義模型
     # MlpPolicy: 使用多層感知器 (適合這種簡單的 Grid 狀態)
     # verbose=1: 顯示訓練進度
-    model = PPO("CnnPolicy", env, verbose=1, learning_rate=0.0003, device="auto")
+    model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.0003, device="auto")
 
     print("開始訓練...")
     # 3. 開始訓練
