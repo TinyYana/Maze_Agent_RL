@@ -7,7 +7,6 @@ def train():
     env = MazeEnv(render_mode='human')
 
     # 2. 定義模型
-    # MlpPolicy: 使用多層感知器 (適合這種簡單的 Grid 狀態)
     # verbose=1: 顯示訓練進度
     model = PPO("MlpPolicy", env, verbose=1, learning_rate=0.0003, device="auto")
 

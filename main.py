@@ -2,12 +2,12 @@ import numpy as np
 import pygame
 import time
 from stable_baselines3 import PPO  # 引入 PPO
-from envs.maze_env_backup import MazeMasterEnv
+from envs.maze_env import MazeEnv  # 修改：從 maze_env 匯入 MazeEnv
 
 
 if __name__ == "__main__":
     # 建立環境，開啟人眼渲染模式
-    env = MazeMasterEnv(render_mode="human")
+    env = MazeEnv(render_mode="human")  # 修改：使用 MazeEnv 類別
     obs, info = env.reset()
 
     print("載入模型中...")
@@ -31,7 +31,8 @@ if __name__ == "__main__":
             action, _states = model.predict(obs, deterministic=False)
         else:
             # 隨機動作 (Fallback)
-            action = np.random.choice([0, 2, 3, 4], p=[0.7, 0.1, 0.1, 0.1])
+            # 修改：MazeEnv 的 action_space 是 MultiDiscrete，直接使用 sample() 產生合法動作
+            action = env.action_space.sample()
 
         # 執行一步
         obs, reward, terminated, truncated, info = env.step(action)
