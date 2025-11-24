@@ -4,7 +4,8 @@ from envs.maze_env import MazeEnv
 
 def train():
     # 1. 建立環境 (訓練時不需要 render_mode="human"，會拖慢速度)
-    env = MazeEnv(render_mode='human')
+    env = MazeEnv(render_mode=None)
+    # env = MazeEnv(render_mode='human')
 
     # 2. 定義模型
     # verbose=1: 顯示訓練進度
