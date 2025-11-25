@@ -22,32 +22,64 @@ if __name__ == "__main__":
         use_model = False
 
     print("遊戲開始！")
+    print("--- 操作說明 ---")
+    print("空白鍵 (Space): 暫停 / 繼續")
+    print("右方向鍵 (Right): 暫停時單步執行")
+    print("----------------")
 
     running = True
+    paused = False  # 新增：暫停狀態標記
+
     while running:
-        if use_model:
-            # 使用模型預測動作
-            # deterministic=False 讓 AI 保持一點隨機性 (探索)，True 則完全依照最高機率
-            action, _states = model.predict(obs, deterministic=False)
-        else:
-            # 隨機動作 (Fallback)
-            # 修改：MazeEnv 的 action_space 是 MultiDiscrete，直接使用 sample() 產生合法動作
-            action = env.action_space.sample()
+        step_this_frame = False  # 新增：單步執行標記
 
-        # 執行一步
-        obs, reward, terminated, truncated, info = env.step(action)
-
-        # 稍微延遲一下，不然人類眼睛跟不上 AI 的速度
-        # 訓練時不需要這個，但展示時需要
-        # time.sleep(0.1)
-
-        if terminated:
-            print("回合結束 (玩家到達出口或路徑被堵死)。重置環境。")
-            obs, info = env.reset()
-
-        # 處理 Pygame 關閉視窗事件
+        # 處理 Pygame 關閉視窗事件與按鍵輸入
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    paused = not paused
+                    print(f"遊戲{'暫停' if paused else '繼續'}")
+                elif event.key == pygame.K_RIGHT:
+                    if paused:
+                        step_this_frame = True
+                        print("單步執行")
+
+        # 只有在 (非暫停) 或 (暫停且觸發單步) 時才執行環境更新
+        if not paused or step_this_frame:
+            if use_model:
+                # 使用模型預測動作
+                # deterministic=False 讓 AI 保持一點隨機性 (探索)，True 則完全依照最高機率
+                action, _states = model.predict(obs, deterministic=False)
+            else:
+                # 隨機動作 (Fallback)
+                # 修改：MazeEnv 的 action_space 是 MultiDiscrete，直接使用 sample() 產生合法動作
+                action = env.action_space.sample()
+
+            # 執行一步
+            obs, reward, terminated, truncated, info = env.step(action)
+
+            # 稍微延遲一下，不然人類眼睛跟不上 AI 的速度
+            # 訓練時不需要這個，但展示時需要
+            # time.sleep(0.1)
+
+            if terminated:
+                reason = info.get("result", "未知")
+                reason_map = {
+                    "blocked": "路徑被堵死",
+                    "died": "生命值耗盡",
+                    "flow_success": "到達出口 (成功)",
+                    "too_fast": "到達出口 (太快)",
+                    "too_slow": "到達出口 (太慢)",
+                    "timeout": "超時",
+                }
+                print(f"回合結束 -> {reason_map.get(reason, reason)}")
+                obs, info = env.reset()
+        else:
+            # 暫停時持續渲染畫面，避免視窗卡死
+            env.render()
+            # 降低 CPU 使用率
+            time.sleep(0.1)
 
     env.close()
