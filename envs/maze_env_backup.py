@@ -3,7 +3,7 @@ from gymnasium import spaces
 import numpy as np
 import pygame
 
-from agents.player_bot import astar_path
+from agents.astar_bot import astar_path
 
 
 # --- 環境類別 (你的程式碼 + Bot 整合) ---
