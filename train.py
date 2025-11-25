@@ -16,9 +16,9 @@ def train():
     # 2. 定義模型
     # 新增 tensorboard_log 參數指定 Log 路徑
     model = PPO(
-        "MlpPolicy",
+        "CnnPolicy",
         env,
-        verbose=1,
+        verbose=3,
         learning_rate=0.0003,
         device="auto",
         tensorboard_log=log_dir,
@@ -27,7 +27,7 @@ def train():
     print("開始訓練...")
     # 3. 開始訓練
     # 新增 tb_log_name 參數，這會建立 ./tensorboard_logs/maze_ppo_run_1/ 的資料夾
-    model.learn(total_timesteps=100000, tb_log_name="maze_ppo_run")
+    model.learn(total_timesteps=150000, tb_log_name="maze_ppo_run")
 
     # 4. 儲存模型
     model_path = "maze_master_ppo"
