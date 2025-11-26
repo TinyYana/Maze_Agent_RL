@@ -1,3 +1,5 @@
 .venv
 .DS_Store
+tensorboard_logs
+.vscode
 __pycache__
