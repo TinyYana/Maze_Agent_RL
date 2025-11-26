@@ -54,8 +54,15 @@ class MazeEnv(gym.Env):
         self.clock = None
         self.font = None
 
+        # 新增：儲存手動操作的下一步方向 (dx, dy)
+        self.manual_move = (0, 0)
+
+    def set_player_move(self, dx, dy):
+        """外部呼叫此函式來設定玩家下一步的移動方向"""
+        self.manual_move = (dx, dy)
+
     def step(self, action):
-        # 0. 計算動作前的路徑長度 (作為基準)
+        # 0. 計算動作前的路徑長度 (作為基準，計算獎勵用，即使是人類玩，AI 仍需知道路徑狀況)
         old_path = astar_path(self.maze, self.player_pos, self.exit_pos)
         old_path_len = len(old_path) if old_path else 0
 
@@ -71,71 +78,117 @@ class MazeEnv(gym.Env):
         self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
         self.maze[self.exit_pos[0], self.exit_pos[1]] = config.ID_EXIT
 
-        # 2. 模擬玩家移動 (A*)
-        path = astar_path(self.maze, self.player_pos, self.exit_pos)
+        # 2. 玩家移動邏輯 (區分 AI 與 HUMAN)
+        path = astar_path(
+            self.maze, self.player_pos, self.exit_pos
+        )  # 重新計算路徑用於獎勵判定
 
         reward = 0
         terminated = False
         truncated = False
         info = {}
 
-        # --- 新增邏輯：計算路徑長度變化獎勵 ---
+        # --- 計算路徑長度變化獎勵 (保持不變，讓 Maze Master 繼續學習) ---
         if path is not None and old_path is not None:
             new_path_len = len(path)
-            # 如果路徑變長了，且沒有被堵死，給予獎勵
             if new_path_len > old_path_len:
                 diff = new_path_len - old_path_len
-                # 限制最大獎勵，避免因為迷宮生成演算法的劇烈變化導致獎勵爆炸
                 reward += min(diff, 10) * config.REWARD_PATH_EXTEND
-                # print(f"Good job! Path extended by {diff}")
-        # -------------------------------------
 
-        if path is None:
-            reward += config.REWARD_BLOCKED  # 使用 += 累加
-            terminated = (
-                True  # 堵死路通常視為回合結束，或者你可以選擇不結束但給予懲罰並還原地圖
-            )
-            info["result"] = "blocked"
+        # --- 移動處理 ---
+        if config.PLAYER_MODE == "AI":
+            # === 原有的 A* 秬動邏輯 ===
+            if path is None:
+                reward += config.REWARD_BLOCKED
+                terminated = True
+                info["result"] = "blocked"
+            else:
+                steps_can_move = len(path) - 1
+                steps_this_turn = min(steps_can_move, config.K_STEP)
 
-            # 選擇性：如果堵死路，還原上一步操作 (讓 Agent 繼續嘗試而不是直接重置)
-            # 這裡保持 terminated = True 比較簡單，讓它學會 "Game Over"
-        else:
-            steps_can_move = len(path) - 1
-            steps_this_turn = min(steps_can_move, config.K_STEP)
+                if steps_this_turn > 0:
+                    # 清除舊位置
+                    if not np.array_equal(self.player_pos, self.exit_pos):
+                        self.maze[self.player_pos[0], self.player_pos[1]] = (
+                            config.ID_EMPTY
+                        )
 
-            if steps_this_turn > 0:
-                # 清除舊位置
-                if not np.array_equal(self.player_pos, self.exit_pos):
-                    self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_EMPTY
+                    # 檢查移動路徑上是否碰撞怪物
+                    path_segment = path[1 : steps_this_turn + 1]
+                    monsters_to_keep = []
+                    hit_count = 0
 
-                # 檢查移動路徑上是否碰撞怪物 (新增邏輯)
-                path_segment = path[1 : steps_this_turn + 1]
-                monsters_to_keep = []
-                hit_count = 0
+                    for m_pos in self.monsters:
+                        is_hit = False
+                        for p_pos in path_segment:
+                            if m_pos[0] == p_pos[0] and m_pos[1] == p_pos[1]:
+                                is_hit = True
+                                break
+                        if is_hit:
+                            hit_count += 1
+                        else:
+                            monsters_to_keep.append(m_pos)
 
-                for m_pos in self.monsters:
-                    # 檢查此怪物是否在玩家的路徑上
-                    is_hit = False
-                    for p_pos in path_segment:
-                        if m_pos[0] == p_pos[0] and m_pos[1] == p_pos[1]:
-                            is_hit = True
-                            break
+                    if hit_count > 0:
+                        self.player_hp -= hit_count
+                        reward += config.REWARD_HIT * hit_count
+                        self.monsters = monsters_to_keep
 
-                    if is_hit:
-                        hit_count += 1
-                    else:
-                        monsters_to_keep.append(m_pos)
+                    # 更新位置
+                    new_pos = path[steps_this_turn]
+                    self.player_pos = np.array(new_pos)
+                    self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
+                    self.current_time += steps_this_turn
 
-                if hit_count > 0:
-                    self.player_hp -= hit_count
-                    reward += config.REWARD_HIT * hit_count  # 玩家受傷給予獎勵
-                    self.monsters = monsters_to_keep
+        elif config.PLAYER_MODE == "HUMAN":
+            # === 新增的手動移動邏輯 ===
+            dx, dy = self.manual_move
 
-                # 更新位置
-                new_pos = path[steps_this_turn]
-                self.player_pos = np.array(new_pos)
-                self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
-                self.current_time += steps_this_turn
+            # 如果路被完全堵死，還是要判斷輸贏 (可選)
+            if path is None:
+                # 這裡可以選擇直接結束，或者讓玩家困在裡面
+                # 為了遊戲體驗，我們只給 Maze Master 獎勵，但不強制結束，除非玩家真的動不了
+                reward += config.REWARD_BLOCKED
+
+            if dx != 0 or dy != 0:
+                nx = self.player_pos[0] + dx
+                ny = self.player_pos[1] + dy
+
+                # 檢查邊界
+                if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
+                    target_cell = self.maze[nx, ny]
+
+                    # 檢查是否撞牆
+                    if target_cell != config.ID_WALL:
+                        # 清除舊位置
+                        if not np.array_equal(self.player_pos, self.exit_pos):
+                            self.maze[self.player_pos[0], self.player_pos[1]] = (
+                                config.ID_EMPTY
+                            )
+
+                        # 檢查是否撞怪
+                        hit_monster = False
+                        monsters_to_keep = []
+                        for m_pos in self.monsters:
+                            if m_pos[0] == nx and m_pos[1] == ny:
+                                hit_monster = True
+                                # 撞到的怪物移除
+                            else:
+                                monsters_to_keep.append(m_pos)
+
+                        if hit_monster:
+                            self.player_hp -= 1
+                            reward += config.REWARD_HIT
+                            self.monsters = monsters_to_keep
+                            # 撞怪后依然移動過去 (或者你可以選擇彈回，這裡選擇移動過去)
+
+                        # 更新位置
+                        self.player_pos = np.array([nx, ny])
+                        self.maze[nx, ny] = config.ID_PLAYER
+                        self.current_time += 1
+
+            # 重置手動指令，避免下一幀自動移動
+            self.manual_move = (0, 0)
 
         # 3. 怪物 AI 移動 (追擊玩家)
         self._move_monsters()
@@ -212,26 +265,37 @@ class MazeEnv(gym.Env):
         ):
             return
 
-        if action_type == 1:  # Wall
+        # 取得當前格子的狀態
+        current_cell = self.maze[x, y]
+
+        # 保護機制：如果該格子已經有東西 (牆壁、怪物)，則不允許覆蓋
+        # 這樣可以防止牆壁把怪物吃掉，或是怪物重疊
+        if current_cell != config.ID_EMPTY:
+            # 唯一的例外：如果是「移除」動作 (action_type == 2)，允許移除牆壁或怪物
+            if action_type != 2:
+                return
+
+        if action_type == 1:  # 放置牆壁
             self.maze[x, y] = config.ID_WALL
-            # 如果該位置原本有怪物，從列表中移除
-            self._remove_monster_at(x, y)
 
-        elif action_type == 2:  # Empty
+        elif action_type == 2:  # 移除 (變成空地)
+            # 如果原本是怪物，要從怪物列表中移除
+            if current_cell == config.ID_MONSTER:
+                self._remove_monster_at(x, y)
             self.maze[x, y] = config.ID_EMPTY
-            self._remove_monster_at(x, y)
 
-        elif action_type == 3:  # Monster
-            # 只有在空地才能放怪物
-            if self.maze[x, y] == config.ID_EMPTY:
+        elif action_type == 3:  # 放置出口 (通常不讓 AI 移動出口，這裡保留邏輯)
+            # 簡化：不讓 AI 移動出口
+            pass
+
+        elif action_type == 4:  # 放置怪物
+            if len(self.monsters) < config.MAX_MONSTERS:
                 self.maze[x, y] = config.ID_MONSTER
                 self.monsters.append([x, y])
-
-        elif action_type == 4:  # Move Exit
-            self.maze[self.exit_pos[0], self.exit_pos[1]] = config.ID_EMPTY
-            self.exit_pos = np.array([x, y], dtype=np.int32)
-            self.maze[x, y] = config.ID_EXIT
-            self._remove_monster_at(x, y)
+            else:
+                # (可選) 如果你想讓 Agent 知道「不能再放了」，可以在這裡做個標記
+                # 但通常只要動作無效，Agent 慢慢就會學到
+                pass
 
     def _move_monsters(self):
         """所有怪物使用 A* 向玩家移動"""
@@ -322,63 +386,59 @@ class MazeEnv(gym.Env):
 
     def _generate_random_maze(self):
         """
-        使用 DFS (Recursive Backtracking) 生成隨機迷宮
-        注意：為了生成漂亮的迷宮，grid_size 最好是奇數 (例如 15, 17, 21)
+        使用 DFS 生成基礎迷宮，然後隨機打通牆壁以製造多條路徑 (Braid Maze)
         """
-        # 先將所有地方填滿牆壁
+        # 1. 初始化：全填滿牆壁
         self.maze.fill(config.ID_WALL)
 
-        # 起點設為 (0, 0) 並標記為空地
+        # 起點設為 (0, 0)
         start_x, start_y = 0, 0
         self.maze[start_x, start_y] = config.ID_EMPTY
 
-        # 使用堆疊 (Stack) 進行 DFS，避免遞迴深度限制
+        # 2. DFS 生成完美迷宮 (確保連通性)
         stack = [(start_x, start_y)]
 
         while stack:
             x, y = stack[-1]
 
-            # 尋找未訪問的鄰居 (距離為 2，因為中間要留牆)
-            # 方向：上、下、左、右
+            # 尋找周圍距離為 2 的未訪問鄰居 (跨過一面牆)
             neighbors = []
-            directions = [(-2, 0), (2, 0), (0, -2), (0, 2)]
-
-            for dx, dy in directions:
+            for dx, dy in [(0, -2), (0, 2), (-2, 0), (2, 0)]:
                 nx, ny = x + dx, y + dy
-
-                # 檢查邊界
                 if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
-                    # 如果該鄰居是牆壁 (代表未訪問過)
                     if self.maze[nx, ny] == config.ID_WALL:
-                        neighbors.append((nx, ny, dx, dy))
+                        neighbors.append((nx, ny, dx // 2, dy // 2))
 
             if neighbors:
-                # 隨機選擇一個鄰居
-                # 使用 self.rng.choice 需要將 list 轉為 index 選擇，或者手動選擇
-                idx = self.rng.integers(0, len(neighbors))
-                nx, ny, dx, dy = neighbors[idx]
-
-                # 打通當前格與鄰居中間的牆
-                self.maze[x + dx // 2, y + dy // 2] = config.ID_EMPTY
-
-                # 將鄰居設為空地
+                # 隨機選一個鄰居
+                nx, ny, wx, wy = self.rng.choice(neighbors)
+                # 打通中間的牆
+                self.maze[x + wx, y + wy] = config.ID_EMPTY
+                # 標記鄰居為通路
                 self.maze[nx, ny] = config.ID_EMPTY
-
-                # 將鄰居加入堆疊
                 stack.append((nx, ny))
             else:
-                # 如果沒有未訪問的鄰居，回溯
                 stack.pop()
 
-        # 隨機移除一些牆壁以製造迴路 (Braiding)，增加迷宮的強健性
-        # 避免 Agent 放一個牆壁就直接把路堵死
-        braid_ratio = 0.15  # 15% 的機率移除剩餘的牆壁
+        # 3. [新增] 隨機移除牆壁以製造多條路徑 (Loops)
+        # loop_probability: 每個牆壁被移除的機率
+        # 0.0 = 完美迷宮 (死路多), 1.0 = 空地
+        loop_probability = 0.15  # 建議 0.1 ~ 0.2
+
         for x in range(1, self.grid_size - 1):
             for y in range(1, self.grid_size - 1):
                 if self.maze[x, y] == config.ID_WALL:
-                    # 確保不會破壞邊界，且隨機打通
-                    if self.rng.random() < braid_ratio:
+                    # 檢查是否為內部牆壁 (不破壞邊界)
+                    # 且隨機骰子命中
+                    if self.rng.random() < loop_probability:
+                        # 額外檢查：避免產生過於空曠的區域 (可選)
+                        # 這裡直接移除，讓迷宮更開放
                         self.maze[x, y] = config.ID_EMPTY
+
+        # 確保出口附近是空的 (雖然 DFS 通常會處理，但保險起見)
+        self.maze[self.grid_size - 1, self.grid_size - 1] = config.ID_EMPTY
+        self.maze[self.grid_size - 2, self.grid_size - 1] = config.ID_EMPTY
+        self.maze[self.grid_size - 1, self.grid_size - 2] = config.ID_EMPTY
 
     def render(self):
         if self.render_mode == "human":
