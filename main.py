@@ -1,8 +1,9 @@
 import numpy as np
 import pygame
 import time
-from stable_baselines3 import PPO  # 引入 PPO
-from envs.maze_env import MazeEnv  # 修改：從 maze_env 匯入 MazeEnv
+from stable_baselines3 import PPO
+from envs.maze_env import MazeEnv
+import config
 
 
 if __name__ == "__main__":
@@ -25,13 +26,15 @@ if __name__ == "__main__":
     print("--- 操作說明 ---")
     print("空白鍵 (Space): 暫停 / 繼續")
     print("右方向鍵 (Right): 暫停時單步執行")
+    print("方向鍵 (Up/Down/Left/Right): 移動角色 (HUMAN 模式)")  # 新增說明
     print("----------------")
 
     running = True
-    paused = False  # 新增：暫停狀態標記
+    paused = False
 
     while running:
-        step_this_frame = False  # 新增：單步執行標記
+        step_this_frame = False
+        human_input_received = False  # 新增：標記本幀是否有玩家輸入
 
         # 處理 Pygame 關閉視窗事件與按鍵輸入
         for event in pygame.event.get():
@@ -41,13 +44,42 @@ if __name__ == "__main__":
                 if event.key == pygame.K_SPACE:
                     paused = not paused
                     print(f"遊戲{'暫停' if paused else '繼續'}")
-                elif event.key == pygame.K_RIGHT:
-                    if paused:
-                        step_this_frame = True
-                        print("單步執行")
+                elif event.key == pygame.K_RIGHT and paused:  # 只有暫停時右鍵才是單步
+                    step_this_frame = True
+                    print("單步執行")
 
-        # 只有在 (非暫停) 或 (暫停且觸發單步) 時才執行環境更新
-        if not paused or step_this_frame:
+                # --- 新增：手動操作監聽 ---
+                # 只有在 HUMAN 模式且沒有暫停時才接收移動指令
+                if config.PLAYER_MODE == "HUMAN" and not paused:
+                    move_x, move_y = 0, 0
+                    if event.key == pygame.K_UP:
+                        move_x = -1
+                    elif event.key == pygame.K_DOWN:
+                        move_x = 1
+                    elif event.key == pygame.K_LEFT:
+                        move_y = -1
+                    elif event.key == pygame.K_RIGHT:
+                        move_y = 1
+
+                    if move_x != 0 or move_y != 0:
+                        env.set_player_move(move_x, move_y)
+                        human_input_received = True
+                # ------------------------
+
+        # 決定是否執行環境更新
+        should_step = False
+
+        if config.PLAYER_MODE == "HUMAN":
+            # 手動模式：只有在收到輸入 (或暫停時的單步除錯) 時才執行
+            if human_input_received or (paused and step_this_frame):
+                should_step = True
+        else:
+            # AI 模式：非暫停狀態，或觸發單步執行
+            if not paused or step_this_frame:
+                should_step = True
+
+        # 只有在需要執行時才呼叫 env.step
+        if should_step:
             if use_model:
                 # 使用模型預測動作
                 # deterministic=False 讓 AI 保持一點隨機性 (探索)，True 則完全依照最高機率
@@ -77,9 +109,9 @@ if __name__ == "__main__":
                 print(f"回合結束 -> {reason_map.get(reason, reason)}")
                 obs, info = env.reset()
         else:
-            # 暫停時持續渲染畫面，避免視窗卡死
+            # 暫停或等待輸入時持續渲染畫面，避免視窗卡死
             env.render()
             # 降低 CPU 使用率
-            time.sleep(0.1)
+            time.sleep(0.05)
 
     env.close()
