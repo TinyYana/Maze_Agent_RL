@@ -66,13 +66,17 @@ class MazeEnv(gym.Env):
         old_path = astar_path(self.maze, self.player_pos, self.exit_pos)
         old_path_len = len(old_path) if old_path else 0
 
+        # 初始化本回合獎勵
+        reward = 0
+
         # 1. 解析並執行 Maze Master 的多重動作
         # action array 形狀為 (ACTIONS_PER_TURN * 3,)
         reshaped_actions = action.reshape(config.ACTIONS_PER_TURN, 3)
 
         for act in reshaped_actions:
             x, y, action_type = act
-            self._apply_action(x, y, action_type)
+            # 累加動作產生的獎勵 (例如移動出口的懲罰)
+            reward += self._apply_action(x, y, action_type)
 
         # 確保玩家和出口標記正確
         self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
@@ -83,7 +87,7 @@ class MazeEnv(gym.Env):
             self.maze, self.player_pos, self.exit_pos
         )  # 重新計算路徑用於獎勵判定
 
-        reward = 0
+        # reward = 0  <-- 移除這行，避免覆蓋掉 _apply_action 產生的獎勵
         terminated = False
         truncated = False
         info = {}
@@ -146,46 +150,43 @@ class MazeEnv(gym.Env):
 
             # 如果路被完全堵死，還是要判斷輸贏 (可選)
             if path is None:
-                # 這裡可以選擇直接結束，或者讓玩家困在裡面
-                # 為了遊戲體驗，我們只給 Maze Master 獎勵，但不強制結束，除非玩家真的動不了
-                reward += config.REWARD_BLOCKED
+                pass
 
             if dx != 0 or dy != 0:
-                nx = self.player_pos[0] + dx
-                ny = self.player_pos[1] + dy
+                new_x = self.player_pos[0] + dx
+                new_y = self.player_pos[1] + dy
 
                 # 檢查邊界
-                if 0 <= nx < self.grid_size and 0 <= ny < self.grid_size:
-                    target_cell = self.maze[nx, ny]
+                if 0 <= new_x < self.grid_size and 0 <= new_y < self.grid_size:
+                    target_cell = self.maze[new_x, new_y]
+                    moved = False
 
-                    # 檢查是否撞牆
+                    # 情況 1: 一般移動 (空地、出口、怪物)
                     if target_cell != config.ID_WALL:
-                        # 清除舊位置
+                        moved = True
+
+                    # 情況 2: 破牆 (是牆壁 且 有工具)
+                    elif target_cell == config.ID_WALL and self.player_hammers > 0:
+                        self.player_hammers -= 1
+                        self.maze[new_x, new_y] = config.ID_EMPTY  # 破壞牆壁
+                        moved = True
+                        print(f"使用了破牆工具！剩餘次數: {self.player_hammers}")
+
+                    # 執行移動
+                    if moved:
+                        # 還原舊位置 (如果是出口要保留出口 ID)
                         if not np.array_equal(self.player_pos, self.exit_pos):
                             self.maze[self.player_pos[0], self.player_pos[1]] = (
                                 config.ID_EMPTY
                             )
+                        else:
+                            self.maze[self.player_pos[0], self.player_pos[1]] = (
+                                config.ID_EXIT
+                            )
 
-                        # 檢查是否撞怪
-                        hit_monster = False
-                        monsters_to_keep = []
-                        for m_pos in self.monsters:
-                            if m_pos[0] == nx and m_pos[1] == ny:
-                                hit_monster = True
-                                # 撞到的怪物移除
-                            else:
-                                monsters_to_keep.append(m_pos)
-
-                        if hit_monster:
-                            self.player_hp -= 1
-                            reward += config.REWARD_HIT
-                            self.monsters = monsters_to_keep
-                            # 撞怪后依然移動過去 (或者你可以選擇彈回，這裡選擇移動過去)
-
-                        # 更新位置
-                        self.player_pos = np.array([nx, ny])
-                        self.maze[nx, ny] = config.ID_PLAYER
-                        self.current_time += 1
+                        # 更新玩家座標
+                        self.player_pos = np.array([new_x, new_y])
+                        self.maze[new_x, new_y] = config.ID_PLAYER
 
             # 重置手動指令，避免下一幀自動移動
             self.manual_move = (0, 0)
@@ -259,11 +260,13 @@ class MazeEnv(gym.Env):
 
     def _apply_action(self, x, y, action_type):
         """執行單一編輯動作"""
+        action_reward = 0
+
         # 保護機制：不能修改玩家或出口當前位置
         if np.array_equal([x, y], self.player_pos) or np.array_equal(
             [x, y], self.exit_pos
         ):
-            return
+            return action_reward
 
         # 取得當前格子的狀態
         current_cell = self.maze[x, y]
@@ -273,7 +276,7 @@ class MazeEnv(gym.Env):
         if current_cell != config.ID_EMPTY:
             # 唯一的例外：如果是「移除」動作 (action_type == 2)，允許移除牆壁或怪物
             if action_type != 2:
-                return
+                return action_reward
 
         if action_type == 1:  # 放置牆壁
             self.maze[x, y] = config.ID_WALL
@@ -284,9 +287,20 @@ class MazeEnv(gym.Env):
                 self._remove_monster_at(x, y)
             self.maze[x, y] = config.ID_EMPTY
 
-        elif action_type == 3:  # 放置出口 (通常不讓 AI 移動出口，這裡保留邏輯)
-            # 簡化：不讓 AI 移動出口
-            pass
+        elif action_type == 3:  # 放置出口
+            # 修改：允許 AI 移動出口
+            # 1. 將舊的出口位置還原為空地
+            old_x, old_y = self.exit_pos
+            self.maze[old_x, old_y] = config.ID_EMPTY
+
+            # 2. 更新出口座標變數
+            self.exit_pos = np.array([x, y], dtype=np.int32)
+
+            # 3. 在地圖矩陣上標記新出口
+            self.maze[x, y] = config.ID_EXIT
+
+            # 懲罰移動出口
+            action_reward = config.REWARD_MOVE_EXIT
 
         elif action_type == 4:  # 放置怪物
             if len(self.monsters) < config.MAX_MONSTERS:
@@ -296,6 +310,8 @@ class MazeEnv(gym.Env):
                 # (可選) 如果你想讓 Agent 知道「不能再放了」，可以在這裡做個標記
                 # 但通常只要動作無效，Agent 慢慢就會學到
                 pass
+
+        return action_reward
 
     def _move_monsters(self):
         """所有怪物使用 A* 向玩家移動"""
@@ -371,6 +387,7 @@ class MazeEnv(gym.Env):
         self.maze[0, 0] = config.ID_PLAYER
         self.current_time = 0
         self.player_hp = config.PLAYER_MAX_HP
+        self.player_hammers = config.PLAYER_INITIAL_HAMMERS  # 新增：初始化破牆工具
 
         self.exit_pos = np.array(
             [self.grid_size - 1, self.grid_size - 1], dtype=np.int32
@@ -501,6 +518,11 @@ class MazeEnv(gym.Env):
         hp_text = f"HP: {self.player_hp} / {config.PLAYER_MAX_HP}"
         text_surface = self.font.render(hp_text, True, (0, 0, 0))
         canvas.blit(text_surface, (10, self.window_size + 10))
+
+        # 新增：繪製破牆工具數量
+        hammer_text = f"Hammer: {self.player_hammers}"
+        hammer_surface = self.font.render(hammer_text, True, (0, 0, 0))
+        canvas.blit(hammer_surface, (150, self.window_size + 10))
 
         if self.render_mode == "human":
             self.window.blit(canvas, canvas.get_rect())
