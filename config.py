@@ -16,7 +16,7 @@ MAX_MONSTERS = 3  # 場上最多同時存在怪物
 PLAYER_MODE = "HUMAN"  # 'AI' (A*自動) 或 'HUMAN' (手動)
 
 # --- 時間限制 ---
-TIME_MIN = 50
+TIME_MIN = 30
 TIME_MAX = 100
 
 # --- ID 定義 ---
