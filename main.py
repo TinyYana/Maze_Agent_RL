@@ -8,7 +8,7 @@ import config
 
 if __name__ == "__main__":
     # 建立環境，開啟人眼渲染模式
-    env = MazeEnv(render_mode="human")  # 修改：使用 MazeEnv 類別
+    env = MazeEnv(render_mode="human")  # 使用 MazeEnv 類別
     obs, info = env.reset()
 
     print("載入模型中...")
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     print("--- 操作說明 ---")
     print("空白鍵 (Space): 暫停 / 繼續")
     print("右方向鍵 (Right): 暫停時單步執行")
-    print("方向鍵 (Up/Down/Left/Right): 移動角色 (HUMAN 模式)")  # 新增說明
+    print("方向鍵 (Up/Down/Left/Right): 移動角色 (HUMAN 模式)")
     print("----------------")
 
     running = True
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     while running:
         step_this_frame = False
-        human_input_received = False  # 新增：標記本幀是否有玩家輸入
+        human_input_received = False  # 標記本幀是否有玩家輸入
 
         # 處理 Pygame 關閉視窗事件與按鍵輸入
         for event in pygame.event.get():
