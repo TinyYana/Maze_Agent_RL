@@ -2,38 +2,35 @@ from stable_baselines3 import PPO
 from envs.maze_env import MazeEnv
 import os
 
-
 def train():
-    # 定義 TensorBoard log 儲存目錄
     log_dir = "./tensorboard_logs/"
     os.makedirs(log_dir, exist_ok=True)
 
     # 1. 建立環境
-    # 強烈建議：若要觀察 TensorBoard 數據，請將 render_mode 設為 None 以加速訓練
     env = MazeEnv(render_mode=None)
-    # env = MazeEnv(render_mode='human')
 
-    # 2. 定義模型
-    # 新增 tensorboard_log 參數指定 Log 路徑
+    # 2. 定義模型 (加入修正參數)
     model = PPO(
-        "CnnPolicy",
+        "CnnPolicy",          # 再次確認：如果你的輸入不是圖片，請改用 "MlpPolicy"
         env,
-        verbose=3,
-        learning_rate=0.0003,
+        verbose=1,            # 設為 1 比較乾淨，只顯示重要 Log
+        learning_rate=0.0003, # 稍微調低一點點
+        ent_coef=0.02,        # [關鍵修正] 強制探索，數值可嘗試 0.01 ~ 0.05
+        gamma=0.99,           # 折扣因子，確保它重視長期獎勵 (預設 0.99)
         device="auto",
         tensorboard_log=log_dir,
     )
 
-    print("開始訓練...")
+    print(f"開始訓練... (Entropy Coef: {model.ent_coef})")
+    
     # 3. 開始訓練
-    # 新增 tb_log_name 參數，這會建立 ./tensorboard_logs/maze_ppo_run_1/ 的資料夾
-    model.learn(total_timesteps=150000, tb_log_name="maze_ppo_run")
+    # 建議增加訓練步數，因為增加探索後收斂會變慢，但結果會更好
+    model.learn(total_timesteps=200000, tb_log_name="maze_ppo_fixed")
 
     # 4. 儲存模型
     model_path = "maze_master_ppo"
     model.save(model_path)
     print(f"模型已儲存至 {model_path}.zip")
-
 
 if __name__ == "__main__":
     train()
