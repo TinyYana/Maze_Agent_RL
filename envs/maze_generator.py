@@ -46,13 +46,13 @@ class MazeGenerator:
                 stack.pop()
 
         # 3. 隨機移除牆壁以製造多條路徑 (Loops)
-        loop_probability = 0.15
+        # loop_probability = 0.15
 
-        for x in range(1, grid_size - 1):
-            for y in range(1, grid_size - 1):
-                if maze[x, y] == config.ID_WALL:
-                    if rng.random() < loop_probability:
-                        maze[x, y] = config.ID_EMPTY
+        # for x in range(1, grid_size - 1):
+        #     for y in range(1, grid_size - 1):
+        #         if maze[x, y] == config.ID_WALL:
+        #             if rng.random() < loop_probability:
+        #                 maze[x, y] = config.ID_EMPTY
 
         # 確保出口附近是空的
         maze[grid_size - 1, grid_size - 1] = config.ID_EMPTY
