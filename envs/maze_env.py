@@ -115,18 +115,52 @@ class MazeEnv(gym.Env):
 
         return reward
 
+    def _action_place_wall(self, x, y):
+        """改進版放牆邏輯：增加更細緻的獎勵"""
+        # 先計算放牆前的路徑
+        old_path = astar_path(self.maze, self.player_pos, self.exit_pos)
+        old_len = len(old_path) if old_path else 0
+
+        # 嘗試放牆
+        self.maze[x, y] = config.ID_WALL
+
+        # 檢查是否堵死
+        new_path = astar_path(self.maze, self.player_pos, self.exit_pos)
+
+        if new_path is None:
+            self.maze[x, y] = config.ID_EMPTY  # 撤銷
+            return config.REWARD_BLOCKED
+
+        new_len = len(new_path)
+        reward = config.REWARD_BUILD_WALL
+
+        # 獎勵放牆後路徑變長
+        if new_len > old_len:
+            path_bonus = (new_len - old_len) * config.REWARD_PATH_EXTEND
+            reward += min(path_bonus, 15.0)  # 設上限避免過度
+
+        # 額外獎勵：牆放在原路徑上（迫使玩家繞路）
+        if old_path and (x, y) in old_path:
+            reward += config.REWARD_WALL_NEAR_PATH
+
+        return reward
+
     def _apply_single_action(self, x, y, action_type):
-        """分發單一編輯動作"""
+        """分發單一編輯動作（增加跳過動作的懲罰）"""
         # 保護機制：不能修改玩家或出口當前位置
         if np.array_equal([x, y], self.player_pos) or np.array_equal(
             [x, y], self.exit_pos
         ):
-            return 0
+            return config.REWARD_SKIP_ACTION  # 小懲罰
+
+        # action_type == 0 表示不做事
+        if action_type == 0:
+            return config.REWARD_SKIP_ACTION
 
         # 保護機制：除非是移除動作，否則不能覆蓋非空格子
         current_cell = self.maze[x, y]
         if current_cell != config.ID_EMPTY and action_type != 2:
-            return 0
+            return config.REWARD_SKIP_ACTION
 
         if action_type == 1:
             return self._action_place_wall(x, y)
@@ -141,13 +175,6 @@ class MazeEnv(gym.Env):
     def _is_path_blocked(self):
         """檢查當前迷宮是否還有路"""
         return astar_path(self.maze, self.player_pos, self.exit_pos) is None
-
-    def _action_place_wall(self, x, y):
-        self.maze[x, y] = config.ID_WALL
-        if self._is_path_blocked():
-            self.maze[x, y] = config.ID_EMPTY  # 撤銷
-            return config.REWARD_BLOCKED
-        return 0
 
     def _action_remove(self, x, y):
         if self.maze[x, y] == config.ID_MONSTER:
