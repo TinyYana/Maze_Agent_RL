@@ -50,6 +50,16 @@ class MazeEnv(gym.Env):
         # 手動操作變數
         self.manual_move = (0, 0)
 
+        # === 新增：允許的動作列表 (預設全部允許) ===
+        # 0: Skip, 1: Wall, 2: Remove, 3: Exit, 4: Monster
+        self.allowed_actions = {0, 1, 2, 3, 4}
+
+    def set_allowed_actions(self, actions_set):
+        """設定當前環境允許執行的動作類型"""
+        self.allowed_actions = set(actions_set)
+        # 0 (Skip) 永遠必須被允許，否則模型會崩潰
+        self.allowed_actions.add(0)
+
     def set_player_move(self, dx, dy):
         self.manual_move = (dx, dy)
 
@@ -147,6 +157,11 @@ class MazeEnv(gym.Env):
 
     def _apply_single_action(self, x, y, action_type):
         """分發單一編輯動作（增加跳過動作的懲罰）"""
+
+        # === 新增：檢查動作是否被允許 ===
+        if action_type not in self.allowed_actions:
+            return config.REWARD_SKIP_ACTION  # 如果動作被禁用，視為 Skip
+
         # 保護機制：不能修改玩家或出口當前位置
         if np.array_equal([x, y], self.player_pos) or np.array_equal(
             [x, y], self.exit_pos
