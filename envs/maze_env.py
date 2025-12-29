@@ -397,7 +397,7 @@ class MazeEnv(gym.Env):
             self.player_hp -= 1
             # 這裡不回傳獎勵，因為通常是 AI 移動時主動撞怪才給獎勵，
             # 或是怪物移動後撞到玩家。這裡可以視需求增加被動受傷的獎勵。
-            return 0
+            return config.REWARD_HIT
         return 0
 
     def _remove_monster_at(self, x, y):
