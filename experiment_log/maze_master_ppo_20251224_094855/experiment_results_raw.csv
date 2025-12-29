@@ -1,0 +1,401 @@
+Scenario,Episode,Result,Steps,Final_HP,Is_Success,Is_Flow,Real_Time_Sec
+1. Static Maze (No Agent),1,flow_success,52,1,1,1,0.0207
+1. Static Maze (No Agent),2,too_fast,44,1,1,0,0.0242
+1. Static Maze (No Agent),3,too_fast,44,2,1,0,0.0168
+1. Static Maze (No Agent),4,flow_success,56,2,1,1,0.0217
+1. Static Maze (No Agent),5,too_fast,28,3,1,0,0.008
+1. Static Maze (No Agent),6,flow_success,80,3,1,1,0.0358
+1. Static Maze (No Agent),7,too_fast,40,3,1,0,0.0182
+1. Static Maze (No Agent),8,flow_success,68,2,1,1,0.0313
+1. Static Maze (No Agent),9,flow_success,60,3,1,1,0.0237
+1. Static Maze (No Agent),10,flow_success,84,3,1,1,0.042
+1. Static Maze (No Agent),11,flow_success,64,1,1,1,0.032
+1. Static Maze (No Agent),12,flow_success,52,1,1,1,0.02
+1. Static Maze (No Agent),13,flow_success,56,3,1,1,0.0201
+1. Static Maze (No Agent),14,too_fast,44,3,1,0,0.014
+1. Static Maze (No Agent),15,too_fast,44,1,1,0,0.0169
+1. Static Maze (No Agent),16,flow_success,64,2,1,1,0.0288
+1. Static Maze (No Agent),17,flow_success,60,2,1,1,0.0239
+1. Static Maze (No Agent),18,too_fast,36,3,1,0,0.0108
+1. Static Maze (No Agent),19,flow_success,84,2,1,1,0.0428
+1. Static Maze (No Agent),20,flow_success,60,1,1,1,0.0262
+1. Static Maze (No Agent),21,flow_success,52,2,1,1,0.0197
+1. Static Maze (No Agent),22,too_fast,48,3,1,0,0.0158
+1. Static Maze (No Agent),23,flow_success,52,3,1,1,0.0195
+1. Static Maze (No Agent),24,flow_success,72,1,1,1,0.0368
+1. Static Maze (No Agent),25,flow_success,72,1,1,1,0.0313
+1. Static Maze (No Agent),26,too_fast,28,3,1,0,0.0077
+1. Static Maze (No Agent),27,too_fast,44,1,1,0,0.0176
+1. Static Maze (No Agent),28,flow_success,84,2,1,1,0.0442
+1. Static Maze (No Agent),29,too_fast,44,3,1,0,0.0171
+1. Static Maze (No Agent),30,too_fast,32,3,1,0,0.0096
+1. Static Maze (No Agent),31,flow_success,64,1,1,1,0.0262
+1. Static Maze (No Agent),32,too_fast,36,2,1,0,0.0112
+1. Static Maze (No Agent),33,flow_success,52,1,1,1,0.0213
+1. Static Maze (No Agent),34,too_fast,40,1,1,0,0.0136
+1. Static Maze (No Agent),35,flow_success,52,3,1,1,0.0189
+1. Static Maze (No Agent),36,too_fast,36,1,1,0,0.0123
+1. Static Maze (No Agent),37,too_fast,48,3,1,0,0.0179
+1. Static Maze (No Agent),38,flow_success,52,2,1,1,0.0197
+1. Static Maze (No Agent),39,flow_success,56,2,1,1,0.0236
+1. Static Maze (No Agent),40,too_fast,48,2,1,0,0.0174
+1. Static Maze (No Agent),41,flow_success,68,3,1,1,0.0298
+1. Static Maze (No Agent),42,flow_success,64,2,1,1,0.0347
+1. Static Maze (No Agent),43,too_fast,40,1,1,0,0.0188
+1. Static Maze (No Agent),44,too_fast,48,1,1,0,0.0205
+1. Static Maze (No Agent),45,too_fast,40,3,1,0,0.0135
+1. Static Maze (No Agent),46,flow_success,80,3,1,1,0.0386
+1. Static Maze (No Agent),47,flow_success,52,1,1,1,0.0253
+1. Static Maze (No Agent),48,flow_success,72,2,1,1,0.0337
+1. Static Maze (No Agent),49,flow_success,60,3,1,1,0.0227
+1. Static Maze (No Agent),50,flow_success,96,3,1,1,0.0498
+1. Static Maze (No Agent),51,too_fast,36,1,1,0,0.019
+1. Static Maze (No Agent),52,too_fast,44,1,1,0,0.0155
+1. Static Maze (No Agent),53,flow_success,88,2,1,1,0.0451
+1. Static Maze (No Agent),54,flow_success,84,3,1,1,0.0419
+1. Static Maze (No Agent),55,flow_success,56,2,1,1,0.0219
+1. Static Maze (No Agent),56,flow_success,68,2,1,1,0.0294
+1. Static Maze (No Agent),57,flow_success,60,1,1,1,0.0288
+1. Static Maze (No Agent),58,flow_success,92,2,1,1,0.0475
+1. Static Maze (No Agent),59,too_fast,40,2,1,0,0.0132
+1. Static Maze (No Agent),60,too_fast,40,1,1,0,0.0209
+1. Static Maze (No Agent),61,too_fast,48,2,1,0,0.022
+1. Static Maze (No Agent),62,too_fast,36,2,1,0,0.0112
+1. Static Maze (No Agent),63,flow_success,72,2,1,1,0.0358
+1. Static Maze (No Agent),64,too_fast,48,1,1,0,0.0162
+1. Static Maze (No Agent),65,flow_success,76,2,1,1,0.0365
+1. Static Maze (No Agent),66,flow_success,72,1,1,1,0.0349
+1. Static Maze (No Agent),67,flow_success,100,1,1,1,0.0544
+1. Static Maze (No Agent),68,flow_success,56,1,1,1,0.0277
+1. Static Maze (No Agent),69,too_fast,44,3,1,0,0.0142
+1. Static Maze (No Agent),70,too_fast,40,2,1,0,0.0165
+1. Static Maze (No Agent),71,flow_success,56,2,1,1,0.0215
+1. Static Maze (No Agent),72,too_fast,44,2,1,0,0.0208
+1. Static Maze (No Agent),73,flow_success,64,2,1,1,0.0337
+1. Static Maze (No Agent),74,died,11,0,0,0,0.0046
+1. Static Maze (No Agent),75,flow_success,64,2,1,1,0.0298
+1. Static Maze (No Agent),76,flow_success,80,3,1,1,0.0424
+1. Static Maze (No Agent),77,too_fast,36,3,1,0,0.0109
+1. Static Maze (No Agent),78,flow_success,80,1,1,1,0.0359
+1. Static Maze (No Agent),79,too_fast,44,1,1,0,0.0213
+1. Static Maze (No Agent),80,flow_success,52,3,1,1,0.0185
+1. Static Maze (No Agent),81,too_fast,40,3,1,0,0.0134
+1. Static Maze (No Agent),82,flow_success,60,2,1,1,0.0275
+1. Static Maze (No Agent),83,flow_success,80,3,1,1,0.0365
+1. Static Maze (No Agent),84,flow_success,52,2,1,1,0.02
+1. Static Maze (No Agent),85,too_fast,40,2,1,0,0.0183
+1. Static Maze (No Agent),86,flow_success,72,3,1,1,0.0339
+1. Static Maze (No Agent),87,too_fast,28,2,1,0,0.0078
+1. Static Maze (No Agent),88,flow_success,56,3,1,1,0.0206
+1. Static Maze (No Agent),89,flow_success,56,1,1,1,0.0215
+1. Static Maze (No Agent),90,too_fast,36,3,1,0,0.0115
+1. Static Maze (No Agent),91,flow_success,84,3,1,1,0.0471
+1. Static Maze (No Agent),92,flow_success,80,3,1,1,0.0366
+1. Static Maze (No Agent),93,too_fast,40,3,1,0,0.0222
+1. Static Maze (No Agent),94,flow_success,64,2,1,1,0.025
+1. Static Maze (No Agent),95,flow_success,68,3,1,1,0.0348
+1. Static Maze (No Agent),96,too_fast,40,1,1,0,0.0189
+1. Static Maze (No Agent),97,flow_success,72,1,1,1,0.0369
+1. Static Maze (No Agent),98,flow_success,88,2,1,1,0.0439
+1. Static Maze (No Agent),99,flow_success,60,3,1,1,0.0231
+1. Static Maze (No Agent),100,too_fast,36,2,1,0,0.0166
+2. Walls Only,1,flow_success,52,3,1,1,0.0215
+2. Walls Only,2,flow_success,84,1,1,1,0.0422
+2. Walls Only,3,too_fast,44,2,1,0,0.02
+2. Walls Only,4,flow_success,72,2,1,1,0.0347
+2. Walls Only,5,too_fast,36,3,1,0,0.0155
+2. Walls Only,6,flow_success,68,2,1,1,0.0345
+2. Walls Only,7,too_fast,48,3,1,0,0.0168
+2. Walls Only,8,too_fast,40,2,1,0,0.0135
+2. Walls Only,9,too_fast,44,2,1,0,0.0195
+2. Walls Only,10,flow_success,64,2,1,1,0.0286
+2. Walls Only,11,flow_success,92,1,1,1,0.0475
+2. Walls Only,12,too_fast,44,3,1,0,0.0158
+2. Walls Only,13,flow_success,76,1,1,1,0.0334
+2. Walls Only,14,flow_success,52,2,1,1,0.0195
+2. Walls Only,15,too_fast,48,3,1,0,0.0172
+2. Walls Only,16,flow_success,100,1,1,1,0.0576
+2. Walls Only,17,flow_success,76,1,1,1,0.0359
+2. Walls Only,18,flow_success,60,3,1,1,0.0227
+2. Walls Only,19,flow_success,80,3,1,1,0.0366
+2. Walls Only,20,too_fast,36,1,1,0,0.0115
+2. Walls Only,21,too_fast,40,1,1,0,0.0195
+2. Walls Only,22,flow_success,64,2,1,1,0.0293
+2. Walls Only,23,flow_success,88,3,1,1,0.0452
+2. Walls Only,24,too_fast,44,1,1,0,0.0157
+2. Walls Only,25,flow_success,76,1,1,1,0.0386
+2. Walls Only,26,too_fast,36,1,1,0,0.0118
+2. Walls Only,27,too_fast,48,2,1,0,0.0183
+2. Walls Only,28,flow_success,56,2,1,1,0.0251
+2. Walls Only,29,flow_success,52,2,1,1,0.024
+2. Walls Only,30,too_slow,102,3,1,0,0.0555
+2. Walls Only,31,flow_success,76,1,1,1,0.0386
+2. Walls Only,32,flow_success,52,1,1,1,0.0187
+2. Walls Only,33,flow_success,80,1,1,1,0.043
+2. Walls Only,34,flow_success,68,2,1,1,0.0276
+2. Walls Only,35,flow_success,84,2,1,1,0.0454
+2. Walls Only,36,too_fast,44,2,1,0,0.018
+2. Walls Only,37,flow_success,52,1,1,1,0.0277
+2. Walls Only,38,too_fast,44,1,1,0,0.0151
+2. Walls Only,39,flow_success,80,1,1,1,0.0398
+2. Walls Only,40,flow_success,52,2,1,1,0.0211
+2. Walls Only,41,too_fast,36,2,1,0,0.0137
+2. Walls Only,42,too_fast,44,3,1,0,0.02
+2. Walls Only,43,too_fast,28,3,1,0,0.0094
+2. Walls Only,44,too_fast,44,2,1,0,0.0148
+2. Walls Only,45,flow_success,64,2,1,1,0.0278
+2. Walls Only,46,flow_success,80,2,1,1,0.0395
+2. Walls Only,47,too_fast,40,3,1,0,0.0127
+2. Walls Only,48,too_fast,40,3,1,0,0.0131
+2. Walls Only,49,too_fast,36,3,1,0,0.0109
+2. Walls Only,50,flow_success,52,2,1,1,0.0195
+2. Walls Only,51,flow_success,56,3,1,1,0.0222
+2. Walls Only,52,flow_success,88,3,1,1,0.0455
+2. Walls Only,53,too_fast,44,3,1,0,0.0155
+2. Walls Only,54,too_fast,36,1,1,0,0.0158
+2. Walls Only,55,flow_success,64,1,1,1,0.0356
+2. Walls Only,56,flow_success,68,1,1,1,0.0394
+2. Walls Only,57,too_fast,48,1,1,0,0.0198
+2. Walls Only,58,flow_success,64,2,1,1,0.0297
+2. Walls Only,59,flow_success,52,1,1,1,0.0225
+2. Walls Only,60,flow_success,92,3,1,1,0.0459
+2. Walls Only,61,too_fast,32,3,1,0,0.0095
+2. Walls Only,62,too_fast,44,3,1,0,0.0149
+2. Walls Only,63,too_fast,44,1,1,0,0.0201
+2. Walls Only,64,flow_success,72,1,1,1,0.0335
+2. Walls Only,65,flow_success,76,3,1,1,0.038
+2. Walls Only,66,flow_success,80,3,1,1,0.0412
+2. Walls Only,67,flow_success,52,1,1,1,0.0194
+2. Walls Only,68,flow_success,64,1,1,1,0.0291
+2. Walls Only,69,too_fast,36,3,1,0,0.0191
+2. Walls Only,70,flow_success,52,3,1,1,0.0211
+2. Walls Only,71,flow_success,60,1,1,1,0.0282
+2. Walls Only,72,flow_success,72,1,1,1,0.0336
+2. Walls Only,73,flow_success,100,1,1,1,0.0521
+2. Walls Only,74,flow_success,76,1,1,1,0.0401
+2. Walls Only,75,flow_success,92,3,1,1,0.046
+2. Walls Only,76,flow_success,52,1,1,1,0.0215
+2. Walls Only,77,flow_success,84,2,1,1,0.0429
+2. Walls Only,78,flow_success,68,1,1,1,0.0315
+2. Walls Only,79,flow_success,52,2,1,1,0.0181
+2. Walls Only,80,flow_success,60,2,1,1,0.0253
+2. Walls Only,81,flow_success,72,3,1,1,0.0351
+2. Walls Only,82,flow_success,56,3,1,1,0.0211
+2. Walls Only,83,flow_success,84,1,1,1,0.0462
+2. Walls Only,84,flow_success,76,1,1,1,0.0358
+2. Walls Only,85,flow_success,56,1,1,1,0.0277
+2. Walls Only,86,flow_success,84,3,1,1,0.0417
+2. Walls Only,87,too_fast,32,3,1,0,0.0095
+2. Walls Only,88,flow_success,52,3,1,1,0.019
+2. Walls Only,89,flow_success,84,2,1,1,0.0452
+2. Walls Only,90,flow_success,52,1,1,1,0.0203
+2. Walls Only,91,too_fast,40,2,1,0,0.0136
+2. Walls Only,92,flow_success,56,1,1,1,0.0223
+2. Walls Only,93,flow_success,96,1,1,1,0.0516
+2. Walls Only,94,too_fast,36,2,1,0,0.0109
+2. Walls Only,95,flow_success,64,2,1,1,0.0266
+2. Walls Only,96,flow_success,80,3,1,1,0.0373
+2. Walls Only,97,too_fast,36,3,1,0,0.0147
+2. Walls Only,98,flow_success,64,2,1,1,0.0299
+2. Walls Only,99,too_fast,40,1,1,0,0.0154
+2. Walls Only,100,flow_success,84,1,1,1,0.0443
+3. Walls + Monsters,1,flow_success,88,1,1,1,0.0479
+3. Walls + Monsters,2,too_fast,44,2,1,0,0.0151
+3. Walls + Monsters,3,flow_success,52,2,1,1,0.0188
+3. Walls + Monsters,4,too_fast,36,1,1,0,0.0175
+3. Walls + Monsters,5,flow_success,72,2,1,1,0.0327
+3. Walls + Monsters,6,flow_success,84,2,1,1,0.0413
+3. Walls + Monsters,7,flow_success,64,2,1,1,0.0285
+3. Walls + Monsters,8,too_fast,36,2,1,0,0.0133
+3. Walls + Monsters,9,flow_success,88,3,1,1,0.0476
+3. Walls + Monsters,10,died,26,0,0,0,0.0127
+3. Walls + Monsters,11,flow_success,68,3,1,1,0.0281
+3. Walls + Monsters,12,too_fast,48,2,1,0,0.0168
+3. Walls + Monsters,13,flow_success,72,3,1,1,0.0294
+3. Walls + Monsters,14,flow_success,96,1,1,1,0.0506
+3. Walls + Monsters,15,flow_success,56,2,1,1,0.0222
+3. Walls + Monsters,16,flow_success,56,2,1,1,0.0228
+3. Walls + Monsters,17,flow_success,64,1,1,1,0.0251
+3. Walls + Monsters,18,flow_success,80,2,1,1,0.0408
+3. Walls + Monsters,19,flow_success,52,1,1,1,0.019
+3. Walls + Monsters,20,flow_success,96,3,1,1,0.051
+3. Walls + Monsters,21,too_fast,48,2,1,0,0.0179
+3. Walls + Monsters,22,too_fast,40,2,1,0,0.0133
+3. Walls + Monsters,23,flow_success,56,1,1,1,0.0219
+3. Walls + Monsters,24,flow_success,76,3,1,1,0.0355
+3. Walls + Monsters,25,flow_success,72,1,1,1,0.0314
+3. Walls + Monsters,26,flow_success,56,3,1,1,0.0207
+3. Walls + Monsters,27,too_fast,40,2,1,0,0.0131
+3. Walls + Monsters,28,flow_success,68,2,1,1,0.0284
+3. Walls + Monsters,29,flow_success,76,3,1,1,0.0353
+3. Walls + Monsters,30,flow_success,64,1,1,1,0.0283
+3. Walls + Monsters,31,flow_success,92,2,1,1,0.0464
+3. Walls + Monsters,32,flow_success,76,2,1,1,0.0403
+3. Walls + Monsters,33,too_fast,40,3,1,0,0.0133
+3. Walls + Monsters,34,flow_success,68,1,1,1,0.0346
+3. Walls + Monsters,35,flow_success,100,1,1,1,0.0543
+3. Walls + Monsters,36,too_fast,44,1,1,0,0.0197
+3. Walls + Monsters,37,flow_success,64,3,1,1,0.0259
+3. Walls + Monsters,38,flow_success,52,2,1,1,0.0195
+3. Walls + Monsters,39,flow_success,60,2,1,1,0.0257
+3. Walls + Monsters,40,flow_success,88,3,1,1,0.0445
+3. Walls + Monsters,41,flow_success,60,2,1,1,0.0251
+3. Walls + Monsters,42,flow_success,80,1,1,1,0.0406
+3. Walls + Monsters,43,flow_success,92,3,1,1,0.0495
+3. Walls + Monsters,44,flow_success,56,3,1,1,0.0201
+3. Walls + Monsters,45,flow_success,80,2,1,1,0.0432
+3. Walls + Monsters,46,too_fast,40,3,1,0,0.0168
+3. Walls + Monsters,47,too_fast,32,3,1,0,0.0095
+3. Walls + Monsters,48,flow_success,64,3,1,1,0.025
+3. Walls + Monsters,49,flow_success,96,2,1,1,0.0529
+3. Walls + Monsters,50,flow_success,72,2,1,1,0.0331
+3. Walls + Monsters,51,too_fast,28,3,1,0,0.0083
+3. Walls + Monsters,52,flow_success,68,1,1,1,0.0348
+3. Walls + Monsters,53,flow_success,52,1,1,1,0.0189
+3. Walls + Monsters,54,flow_success,60,2,1,1,0.0245
+3. Walls + Monsters,55,too_fast,40,3,1,0,0.013
+3. Walls + Monsters,56,flow_success,56,3,1,1,0.021
+3. Walls + Monsters,57,flow_success,56,1,1,1,0.025
+3. Walls + Monsters,58,flow_success,56,2,1,1,0.0245
+3. Walls + Monsters,59,too_fast,44,3,1,0,0.0143
+3. Walls + Monsters,60,too_fast,36,3,1,0,0.0111
+3. Walls + Monsters,61,too_fast,48,2,1,0,0.0177
+3. Walls + Monsters,62,flow_success,60,1,1,1,0.0274
+3. Walls + Monsters,63,too_fast,48,2,1,0,0.0173
+3. Walls + Monsters,64,flow_success,68,2,1,1,0.0296
+3. Walls + Monsters,65,too_fast,44,1,1,0,0.0179
+3. Walls + Monsters,66,flow_success,60,3,1,1,0.0258
+3. Walls + Monsters,67,flow_success,64,2,1,1,0.0249
+3. Walls + Monsters,68,too_fast,40,1,1,0,0.0174
+3. Walls + Monsters,69,too_fast,40,1,1,0,0.0133
+3. Walls + Monsters,70,too_fast,48,3,1,0,0.0166
+3. Walls + Monsters,71,flow_success,68,2,1,1,0.0349
+3. Walls + Monsters,72,flow_success,84,3,1,1,0.0433
+3. Walls + Monsters,73,too_fast,32,3,1,0,0.0096
+3. Walls + Monsters,74,too_fast,48,3,1,0,0.0173
+3. Walls + Monsters,75,flow_success,52,3,1,1,0.0194
+3. Walls + Monsters,76,too_fast,40,3,1,0,0.0146
+3. Walls + Monsters,77,flow_success,52,2,1,1,0.025
+3. Walls + Monsters,78,flow_success,80,1,1,1,0.0355
+3. Walls + Monsters,79,flow_success,72,2,1,1,0.0353
+3. Walls + Monsters,80,flow_success,84,2,1,1,0.0418
+3. Walls + Monsters,81,flow_success,80,1,1,1,0.0383
+3. Walls + Monsters,82,flow_success,88,1,1,1,0.0498
+3. Walls + Monsters,83,flow_success,96,1,1,1,0.0544
+3. Walls + Monsters,84,too_fast,36,2,1,0,0.0162
+3. Walls + Monsters,85,flow_success,72,3,1,1,0.0294
+3. Walls + Monsters,86,flow_success,68,1,1,1,0.0278
+3. Walls + Monsters,87,flow_success,68,1,1,1,0.0303
+3. Walls + Monsters,88,flow_success,80,1,1,1,0.0423
+3. Walls + Monsters,89,too_fast,28,3,1,0,0.0079
+3. Walls + Monsters,90,too_fast,32,2,1,0,0.0133
+3. Walls + Monsters,91,too_fast,44,3,1,0,0.0154
+3. Walls + Monsters,92,flow_success,76,1,1,1,0.0408
+3. Walls + Monsters,93,flow_success,92,3,1,1,0.0497
+3. Walls + Monsters,94,too_fast,32,1,1,0,0.0189
+3. Walls + Monsters,95,flow_success,88,2,1,1,0.0496
+3. Walls + Monsters,96,flow_success,88,2,1,1,0.0435
+3. Walls + Monsters,97,too_fast,48,2,1,0,0.02
+3. Walls + Monsters,98,too_fast,44,3,1,0,0.0144
+3. Walls + Monsters,99,too_fast,40,2,1,0,0.0128
+3. Walls + Monsters,100,too_fast,44,3,1,0,0.0148
+4. Full Features,1,too_fast,36,3,1,0,0.0117
+4. Full Features,2,too_fast,48,2,1,0,0.0188
+4. Full Features,3,flow_success,52,3,1,1,0.0203
+4. Full Features,4,flow_success,88,2,1,1,0.0516
+4. Full Features,5,too_fast,40,3,1,0,0.0126
+4. Full Features,6,flow_success,84,1,1,1,0.0443
+4. Full Features,7,flow_success,84,1,1,1,0.0464
+4. Full Features,8,flow_success,64,1,1,1,0.0269
+4. Full Features,9,flow_success,52,2,1,1,0.0188
+4. Full Features,10,flow_success,60,1,1,1,0.0236
+4. Full Features,11,too_fast,40,1,1,0,0.0131
+4. Full Features,12,flow_success,64,2,1,1,0.0269
+4. Full Features,13,flow_success,84,2,1,1,0.0389
+4. Full Features,14,flow_success,56,2,1,1,0.0243
+4. Full Features,15,flow_success,80,2,1,1,0.0419
+4. Full Features,16,too_fast,44,3,1,0,0.0148
+4. Full Features,17,too_fast,48,3,1,0,0.0169
+4. Full Features,18,flow_success,68,1,1,1,0.0292
+4. Full Features,19,flow_success,56,1,1,1,0.0245
+4. Full Features,20,flow_success,84,3,1,1,0.0432
+4. Full Features,21,flow_success,68,3,1,1,0.0294
+4. Full Features,22,flow_success,68,1,1,1,0.0298
+4. Full Features,23,too_fast,44,3,1,0,0.0145
+4. Full Features,24,too_fast,48,2,1,0,0.0163
+4. Full Features,25,flow_success,72,1,1,1,0.0332
+4. Full Features,26,too_fast,32,3,1,0,0.0092
+4. Full Features,27,flow_success,76,3,1,1,0.0338
+4. Full Features,28,too_fast,32,3,1,0,0.0115
+4. Full Features,29,flow_success,96,1,1,1,0.0546
+4. Full Features,30,flow_success,80,1,1,1,0.0391
+4. Full Features,31,flow_success,56,1,1,1,0.0286
+4. Full Features,32,flow_success,72,3,1,1,0.0365
+4. Full Features,33,too_fast,36,2,1,0,0.0128
+4. Full Features,34,flow_success,52,1,1,1,0.0198
+4. Full Features,35,flow_success,88,2,1,1,0.0441
+4. Full Features,36,too_fast,44,2,1,0,0.0177
+4. Full Features,37,flow_success,64,2,1,1,0.033
+4. Full Features,38,flow_success,72,2,1,1,0.0306
+4. Full Features,39,flow_success,72,2,1,1,0.032
+4. Full Features,40,too_fast,36,3,1,0,0.0109
+4. Full Features,41,flow_success,72,1,1,1,0.0346
+4. Full Features,42,flow_success,60,3,1,1,0.0268
+4. Full Features,43,too_fast,48,2,1,0,0.0174
+4. Full Features,44,too_fast,44,3,1,0,0.0158
+4. Full Features,45,flow_success,72,3,1,1,0.0313
+4. Full Features,46,flow_success,72,1,1,1,0.0353
+4. Full Features,47,flow_success,80,2,1,1,0.0354
+4. Full Features,48,too_fast,44,1,1,0,0.0218
+4. Full Features,49,flow_success,76,3,1,1,0.0402
+4. Full Features,50,flow_success,96,3,1,1,0.0508
+4. Full Features,51,flow_success,84,3,1,1,0.0402
+4. Full Features,52,too_fast,32,2,1,0,0.0095
+4. Full Features,53,flow_success,56,2,1,1,0.0212
+4. Full Features,54,too_fast,40,1,1,0,0.0144
+4. Full Features,55,flow_success,72,1,1,1,0.0319
+4. Full Features,56,too_fast,48,3,1,0,0.0169
+4. Full Features,57,flow_success,76,2,1,1,0.0365
+4. Full Features,58,flow_success,60,2,1,1,0.0311
+4. Full Features,59,flow_success,68,1,1,1,0.032
+4. Full Features,60,flow_success,60,3,1,1,0.0244
+4. Full Features,61,flow_success,64,2,1,1,0.0334
+4. Full Features,62,flow_success,56,2,1,1,0.0215
+4. Full Features,63,flow_success,76,2,1,1,0.0409
+4. Full Features,64,too_fast,32,3,1,0,0.0097
+4. Full Features,65,too_fast,44,3,1,0,0.0153
+4. Full Features,66,too_fast,40,3,1,0,0.0132
+4. Full Features,67,too_fast,44,3,1,0,0.0146
+4. Full Features,68,too_fast,44,3,1,0,0.0145
+4. Full Features,69,flow_success,68,2,1,1,0.0304
+4. Full Features,70,flow_success,92,2,1,1,0.046
+4. Full Features,71,flow_success,68,1,1,1,0.0296
+4. Full Features,72,too_fast,44,1,1,0,0.0163
+4. Full Features,73,too_fast,32,1,1,0,0.0093
+4. Full Features,74,flow_success,88,1,1,1,0.0527
+4. Full Features,75,too_fast,44,3,1,0,0.0171
+4. Full Features,76,too_fast,36,2,1,0,0.0134
+4. Full Features,77,flow_success,64,2,1,1,0.0267
+4. Full Features,78,flow_success,92,2,1,1,0.0512
+4. Full Features,79,flow_success,52,2,1,1,0.0189
+4. Full Features,80,flow_success,56,1,1,1,0.0268
+4. Full Features,81,flow_success,56,2,1,1,0.0275
+4. Full Features,82,flow_success,56,1,1,1,0.0272
+4. Full Features,83,too_fast,44,2,1,0,0.0146
+4. Full Features,84,flow_success,52,3,1,1,0.0182
+4. Full Features,85,flow_success,92,1,1,1,0.048
+4. Full Features,86,flow_success,56,1,1,1,0.0246
+4. Full Features,87,flow_success,88,3,1,1,0.0437
+4. Full Features,88,flow_success,88,2,1,1,0.0438
+4. Full Features,89,flow_success,64,2,1,1,0.0294
+4. Full Features,90,flow_success,80,1,1,1,0.0379
+4. Full Features,91,flow_success,84,3,1,1,0.0404
+4. Full Features,92,flow_success,76,2,1,1,0.0347
+4. Full Features,93,flow_success,80,1,1,1,0.0398
+4. Full Features,94,flow_success,64,1,1,1,0.0299
+4. Full Features,95,flow_success,64,2,1,1,0.027
+4. Full Features,96,too_fast,48,2,1,0,0.018
+4. Full Features,97,flow_success,56,3,1,1,0.0214
+4. Full Features,98,too_fast,40,3,1,0,0.0128
+4. Full Features,99,flow_success,68,2,1,1,0.0322
+4. Full Features,100,flow_success,92,3,1,1,0.0534

@@ -1,0 +1,5 @@
+Scenario,Avg_Steps,Std_Steps,Success_Rate,Flow_Rate,Avg_HP
+1. Static Maze (No Agent),59.32,16.270988000273693,100.0,73.0,3.0
+2. Walls Only,62.28,21.21371768884035,100.0,64.0,3.0
+3. Walls + Monsters,57.64,17.42256750843166,100.0,63.0,2.96
+4. Full Features,74.35,52.27711224471437,70.0,26.0,2.97
