@@ -36,7 +36,7 @@ REWARD_STEP = 0.1
 REWARD_DEATH = -8
 
 REWARD_HIT = 1.0
-REWARD_PATH_EXTEND = 2.5  # 每延長一步的獎勵（累積效果更明顯）
+REWARD_PATH_EXTEND = 0.5  # 每延長一步的獎勵（累積效果更明顯）
 REWARD_MOVE_EXIT = -0.3
 
 # === 新增：放牆相關獎勵 ===
