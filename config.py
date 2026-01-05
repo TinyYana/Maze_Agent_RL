@@ -44,7 +44,34 @@ REWARD_BUILD_WALL = 3.0  # 放牆成功基礎獎勵（大幅提高）
 REWARD_WALL_NEAR_PATH = 2.0  # 放牆靠近玩家路徑額外獎勵
 REWARD_SKIP_ACTION = -0.1  # 不做任何事的小懲罰（鼓勵行動）
 
-# --- 顏色定義 (R, G, B) ---
+# --- 視覺美化設定 (Visuals) ---
+# 使用柔和的現代配色 (RGB)
+
+# 背景與格線
+COLOR_BG = (241, 242, 246)  # 淺灰白背景
+COLOR_GRID = (223, 228, 234)  # 非常淡的格線
+
+# 牆壁 (深色石板風格)
+COLOR_WALL_TOP = (87, 96, 111)  # 牆壁頂部
+COLOR_WALL_SIDE = (47, 53, 66)  # 牆壁陰影面
+
+# 玩家 (亮青色/英雄色)
+COLOR_PLAYER_BODY = (52, 152, 219)
+COLOR_PLAYER_BORDER = (41, 128, 185)
+
+# 出口 (金色/傳送門)
+COLOR_EXIT_OUTER = (241, 196, 15)
+COLOR_EXIT_INNER = (243, 156, 18)
+
+# 怪物 (警示紅)
+COLOR_MONSTER_BODY = (231, 76, 60)
+COLOR_MONSTER_EYE = (44, 62, 80)
+
+# UI 介面
+COLOR_UI_BG = (44, 62, 80)  # 深藍色儀表板背景
+COLOR_TEXT = (236, 240, 241)  # 白色文字
+
+# 舊的顏色定義 (為了相容性保留，或直接替換)
 COLOR_WHITE = (255, 255, 255)
 COLOR_BLACK = (0, 0, 0)
 COLOR_BLUE = (0, 0, 255)
