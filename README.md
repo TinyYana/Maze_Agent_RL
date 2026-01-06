@@ -1,6 +1,6 @@
 # Maze Agent RL: 基於深度強化學習與 PCGRL 的動態迷宮生成系統
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.12.9+-blue.svg)](https://www.python.org/)
 [![Stable Baselines3](https://img.shields.io/badge/SB3-PPO-brightgreen)](https://stable-baselines3.readthedocs.io/)
 [![Gymnasium](https://img.shields.io/badge/Gymnasium-Env-orange)](https://gymnasium.farama.org/)
 [![Pygame](https://img.shields.io/badge/Pygame-Rendering-yellow)](https://www.pygame.org/)
@@ -117,8 +117,6 @@ Agent 的目標不是殺死玩家，也不是讓玩家最快通關，而是：
 
 1.  **禁止** 未經書面同意的重製、修改、分發。
 2.  **嚴禁** 第三方將本代碼用於個人專題、學術論文或競賽。
-3. 僅供 **檢閱** 使用。
+3.  僅供 **檢閱** 使用。
 
 詳細條款請參閱 [LICENSE](LICENSE) 檔案。
-
-
