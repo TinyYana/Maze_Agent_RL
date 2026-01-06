@@ -15,6 +15,12 @@ MAX_MONSTERS = 3
 
 PLAYER_MODE = "HUMAN"
 
+# --- AI 行為設定 ---
+# 0.0 = 完美 A* (最短路徑)
+# 0.3 = 輕微隨機 (偶爾繞路)
+# 1.0 = 高度隨機 (容易迷路)
+AI_RANDOMNESS = 0.0
+
 # --- 時間限制 ---
 TIME_MIN = 50
 TIME_MAX = 100

@@ -225,34 +225,31 @@ class MazeEnv(gym.Env):
     # =========================================================================
 
     def _handle_player_turn(self):
-        """處理玩家移動與路徑獎勵"""
-        reward = 0
-        terminated = False
-        info = {}
+        """處理玩家的回合 (AI 或 Human)"""
+        path = []
 
-        # 重新計算路徑
-        path = astar_path(self.maze, self.player_pos, self.exit_pos)
-
-        # 計算路徑長度變化獎勵 (鼓勵 Maze Master 延長路徑)
-        if path is not None and self.old_path_len > 0:
-            new_path_len = len(path)
-            if new_path_len > self.old_path_len:
-                diff = new_path_len - self.old_path_len
-                reward += min(diff, 10) * config.REWARD_PATH_EXTEND
-
-        # 根據模式執行移動
+        # 如果是 AI 模式，或者雖然是 Human 模式但需要導航輔助
         if config.PLAYER_MODE == "AI":
-            r, t, i = self._move_ai_player(path)
+            # 在這裡傳入 randomness 參數
+            path = astar_path(
+                self.maze,
+                self.player_pos,
+                self.exit_pos,
+                randomness=config.AI_RANDOMNESS,
+            )
+
+            if path is None:
+                # 找不到路徑 (被堵死)
+                pass
+            else:
+                # 讓 AI 移動
+                self._move_ai_player(path)
+
         elif config.PLAYER_MODE == "HUMAN":
-            r, t, i = self._move_human_player()
-        else:
-            r, t, i = 0, False, {}
+            # 人類操作邏輯...
+            self._move_human_player()
 
-        reward += r
-        terminated = terminated or t
-        info.update(i)
-
-        return reward, terminated, info
+        return 0, False, {}
 
     def _move_ai_player(self, path):
         reward = 0
