@@ -1,0 +1,51 @@
+flowchart TD
+  %% ========== 讀者導向版本：描述「發生什麼事」而不是「哪個函式」 ==========
+
+  classDef brain fill:#e1f5fe,stroke:#01579b,stroke-width:2px,color:#111;
+  classDef env fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#111;
+  classDef learn fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#111;
+  classDef debug fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#111;
+
+  subgraph Loop["🔁 一次回合（env.step）會發生的事"]
+    S["👀 AI 看到的狀態 State(t)<br/>灰階影像：(1, 60, 60) uint8<br/>（15×15 迷宮放大 4 倍）"]:::brain
+
+    P["🧠 PPO（CnnPolicy）<br/>從影像判斷要怎麼『編輯迷宮』"]:::brain
+
+    A["🎮 動作 Action(t) = 多個子動作（MultiDiscrete）<br/>每個子動作選：x、y、動作類型<br/>類型：Skip / 放牆 / 移除 / 移動出口 / 放怪物"]:::brain
+
+    E["🌍 Maze 環境（MazeEnv）"]:::env
+
+    S --> P --> A --> E
+
+    subgraph Inside["環境內部會依序處理"]
+      Edit["① Maze Master 編輯地圖<br/>（遵守 allowed_actions；避免破壞玩家/出口格）"]:::env
+      Player["② 玩家移動<br/>AI 模式：A* 找路並前進（最多 K_STEP）<br/>Human 模式：依鍵盤移動（可用 hammer 破牆）"]:::env
+      Monsters["③ 怪物移動<br/>每隻怪物用 A* 追玩家"]:::env
+      Hit["④ 碰撞/受傷處理<br/>玩家撞到怪物會扣血、怪物可能被移除"]:::env
+      End["⑤ 結果判定<br/>勝利 / 死亡 / 超時 / 太快 / 心流 / 太慢<br/>（門檻由 config.TIME_MIN / TIME_MAX 決定）"]:::env
+    end
+
+    E --> Edit --> Player --> Monsters --> Hit --> End
+
+    R["🧮 回饋 Reward(t)<br/>= 編輯分數 + 移動分數 + 碰撞分數 + 結果分數"]:::learn
+    S2["👀 下一個狀態 State(t+1)"]:::brain
+
+    End --> R
+    E --> S2
+  end
+
+  subgraph Train["📉 訓練（PPO 怎麼變強）"]
+    Buf["🧺 收集一段 rollout<br/>把 (狀態、動作、回饋、終止、價值、log_prob) 存起來"]:::learn
+    GAE["📊 用 Critic 做優勢估計（GAE λ）"]:::learn
+    Upd["🔄 批次更新網路（PPO clipping）<br/>讓『好動作更常被選到，壞動作更少被選到』"]:::learn
+    S --> Buf
+    R --> Buf
+    S2 --> Buf
+    Buf --> GAE --> Upd -.-> P
+  end
+
+  subgraph Debug["🖼️ 人類可讀的除錯視野（train.py）"]
+    CB["SaveObservationCallback<br/>每 N 步把 AI 的觀測存成圖片"]:::debug
+    PNG["debug_vision/run_時間戳/obs_step_XXXX.png<br/>（把 0/50/100/150/200 映射成顏色）"]:::debug
+    S2 --> CB --> PNG
+  end
