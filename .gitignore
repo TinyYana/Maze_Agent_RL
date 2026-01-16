@@ -3,3 +3,6 @@
 tensorboard_logs
 .vscode
 __pycache__
+*.spec
+build
+dist
