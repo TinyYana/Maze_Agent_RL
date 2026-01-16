@@ -1,10 +1,26 @@
 import numpy as np
 import pygame
 import time
+import sys  # 新增
+import os  # 新增
 from stable_baselines3 import PPO
 from envs.maze_env import MazeEnv
 import config
 
+
+# --- 新增：資源路徑處理函式 ---
+def resource_path(relative_path):
+    """取得資源的絕對路徑，用於 PyInstaller 打包後的暫存路徑處理"""
+    try:
+        # PyInstaller 會建立一個暫存資料夾並將路徑存於 _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+
+# ---------------------------
 
 if __name__ == "__main__":
     # 建立環境，開啟人眼渲染模式
@@ -13,9 +29,10 @@ if __name__ == "__main__":
 
     print("載入模型中...")
     try:
-        # 嘗試載入訓練好的模型
-        model = PPO.load("maze_master_ppo")
-        print("模型載入成功！")
+        # 修改：使用 resource_path 來取得模型路徑
+        model_path = resource_path("maze_master_ppo")
+        model = PPO.load(model_path)
+        print(f"模型載入成功！(路徑: {model_path})")
         use_model = True
     except FileNotFoundError:
         print("找不到模型檔案 'maze_master_ppo.zip'，將使用隨機動作。")
