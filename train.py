@@ -145,7 +145,7 @@ def train():
     backup_model_path = os.path.join(models_dir, f"maze_master_ppo_{run_name}")
     model.save(backup_model_path)
 
-    print(f"訓練完成！")
+    print("訓練完成！")
     print(f"主要模型已更新: {default_model_path}.zip")
     print(f"歷史備份已存檔: {backup_model_path}.zip")
 

@@ -6,3 +6,4 @@ __pycache__
 *.spec
 build
 dist
+debug_vision
