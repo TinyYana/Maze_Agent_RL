@@ -1,10 +1,9 @@
+import os
+import numpy as np
+import datetime  # 新增：用於產生時間戳記
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
 from envs.maze_env import MazeEnv
-import os
-import numpy as np
-import cv2
-import datetime  # 新增：用於產生時間戳記
 
 # 記得確保 config 有被引入
 import config
@@ -19,6 +18,8 @@ class SaveObservationCallback(BaseCallback):
         os.makedirs(self.save_path, exist_ok=True)
 
     def _on_step(self) -> bool:
+        import cv2
+
         # 每隔 save_freq 步執行一次
         if self.n_calls % self.save_freq == 0:
             # 取得目前的觀測值 (這就是 AI 看到的 raw data)
@@ -113,15 +114,24 @@ def train():
     )
 
     # 建立 Callback 實例 (傳入這次專屬的資料夾)
-    vision_callback = SaveObservationCallback(save_freq=1000, save_path=debug_img_dir)
+    vision_callback = None
+    try:
+        import cv2  # noqa: F401
+
+        vision_callback = SaveObservationCallback(save_freq=1000, save_path=debug_img_dir)
+    except ImportError:
+        print("⚠️ cv2 無法載入，將跳過 AI 視野圖儲存 callback。")
+
+    total_timesteps = int(os.getenv("TRAIN_TIMESTEPS", "500000"))
 
     print(f"=== 開始訓練: {run_name} ===")
     print(f"Entropy Coef: {model.ent_coef}")
     print(f"AI 視野圖將儲存於: {debug_img_dir}")
+    print(f"訓練步數: {total_timesteps}")
 
     # 5. 開始訓練
     model.learn(
-        total_timesteps=500000,
+        total_timesteps=total_timesteps,
         tb_log_name=f"maze_ppo_{run_name}",  # TensorBoard 也加上名稱區分
         callback=vision_callback,
     )
@@ -141,9 +151,4 @@ def train():
 
 
 if __name__ == "__main__":
-    # 需要先引入 config 才能用 INTER_NEAREST，或者直接用 cv2.INTER_NEAREST
-    import cv2
-
-    config = type("config", (), {"INTER_NEAREST": cv2.INTER_NEAREST})
-
     train()

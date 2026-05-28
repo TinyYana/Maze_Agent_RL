@@ -240,14 +240,14 @@ class MazeEnv(gym.Env):
 
             if path is None:
                 # 找不到路徑 (被堵死)
-                pass
+                return self._move_ai_player(path)
             else:
                 # 讓 AI 移動
-                self._move_ai_player(path)
+                return self._move_ai_player(path)
 
         elif config.PLAYER_MODE == "HUMAN":
             # 人類操作邏輯...
-            self._move_human_player()
+            return self._move_human_player()
 
         return 0, False, {}
 
@@ -306,6 +306,7 @@ class MazeEnv(gym.Env):
             print(f"使用了破牆工具！剩餘次數: {self.player_hammers}")
 
         if moved:
+            self.current_time += 1
             self.player_steps += 1
             self._update_player_position([new_x, new_y])
 
