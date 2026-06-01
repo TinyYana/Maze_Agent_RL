@@ -46,7 +46,11 @@ jobs:
           pyinstaller `
             --noconfirm `
             --clean `
-            MazeGame.spec
+            --onefile `
+            --windowed `
+            --name MazeGame `
+            --add-data "maze_master_ppo.zip;." `
+            main.py
           Copy-Item dist\MazeGame.exe "dist\MazeGame-${{ steps.version.outputs.version }}.exe"
 
       - name: Upload build artifact
