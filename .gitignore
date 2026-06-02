@@ -4,6 +4,7 @@ tensorboard_logs
 .vscode
 __pycache__
 *.spec
+!MazeGame.spec
 build
 dist
 debug_vision
