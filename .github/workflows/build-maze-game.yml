@@ -46,12 +46,17 @@ jobs:
           pyinstaller `
             --noconfirm `
             --clean `
-            --onefile `
-            --windowed `
-            --name MazeGame `
-            --add-data "maze_master_ppo.zip;." `
-            main.py
+            MazeGame.spec
           Copy-Item dist\MazeGame.exe "dist\MazeGame-${{ steps.version.outputs.version }}.exe"
+
+      - name: Verify bundled Stable-Baselines3 data
+        shell: pwsh
+        run: |
+          $archiveContents = pyi-archive_viewer -r -b dist\MazeGame.exe
+          $versionFile = $archiveContents | Select-String -Pattern 'stable_baselines3[\\/]+version\.txt'
+          if (-not $versionFile) {
+            throw "stable_baselines3/version.txt was not bundled into MazeGame.exe"
+          }
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
