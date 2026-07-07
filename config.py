@@ -21,6 +21,12 @@ PLAYER_MODE = "HUMAN"
 # 1.0 = 高度隨機 (容易迷路)
 AI_RANDOMNESS = 0.0
 
+# 訓練泛化：每回合隨機抽玩家個性 (繞路程度 + 猶豫機率)，
+# 模擬真實玩家而非完美 A*。train.py 會開啟；demo/評估預設關閉。
+PLAYER_PROFILE_RANDOMIZE = False
+PLAYER_RANDOMNESS_RANGE = (0.0, 0.8)  # 每回合抽樣的繞路程度
+PLAYER_HESITATE_RANGE = (0.0, 0.3)  # 每回合抽樣的猶豫機率 (該回合不移動)
+
 # --- 時間限制 ---
 TIME_MIN = 50
 TIME_MAX = 100
@@ -51,31 +57,32 @@ REWARD_WALL_NEAR_PATH = 2.0  # 放牆靠近玩家路徑額外獎勵
 REWARD_SKIP_ACTION = -0.1  # 不做任何事的小懲罰（鼓勵行動）
 
 # --- 視覺美化設定 (Visuals) ---
-# 使用柔和的現代配色 (RGB)
+# 深色科技感主題 (RGB)
 
 # 背景與格線
-COLOR_BG = (241, 242, 246)  # 淺灰白背景
-COLOR_GRID = (223, 228, 234)  # 非常淡的格線
+COLOR_BG = (24, 29, 43)  # 深藍夜色背景
+COLOR_GRID = (35, 42, 60)  # 微亮格線
 
-# 牆壁 (深色石板風格)
-COLOR_WALL_TOP = (87, 96, 111)  # 牆壁頂部
-COLOR_WALL_SIDE = (47, 53, 66)  # 牆壁陰影面
+# 牆壁 (石板浮雕風格)
+COLOR_WALL_TOP = (74, 86, 112)  # 牆壁頂部
+COLOR_WALL_SIDE = (42, 50, 68)  # 牆壁陰影面
 
 # 玩家 (亮青色/英雄色)
-COLOR_PLAYER_BODY = (52, 152, 219)
-COLOR_PLAYER_BORDER = (41, 128, 185)
+COLOR_PLAYER_BODY = (64, 169, 240)
+COLOR_PLAYER_BORDER = (36, 120, 190)
 
 # 出口 (金色/傳送門)
 COLOR_EXIT_OUTER = (241, 196, 15)
-COLOR_EXIT_INNER = (243, 156, 18)
+COLOR_EXIT_INNER = (250, 220, 90)
 
 # 怪物 (警示紅)
-COLOR_MONSTER_BODY = (231, 76, 60)
-COLOR_MONSTER_EYE = (44, 62, 80)
+COLOR_MONSTER_BODY = (235, 87, 75)
+COLOR_MONSTER_EYE = (30, 34, 46)
 
 # UI 介面
-COLOR_UI_BG = (44, 62, 80)  # 深藍色儀表板背景
-COLOR_TEXT = (236, 240, 241)  # 白色文字
+COLOR_UI_BG = (17, 21, 32)  # 更深的儀表板背景
+COLOR_TEXT = (228, 234, 242)  # 白色文字
+COLOR_ACCENT = (155, 89, 182)  # 紫色點綴 (代表 Maze Master)
 
 # 舊的顏色定義 (為了相容性保留，或直接替換)
 COLOR_WHITE = (255, 255, 255)

@@ -27,6 +27,9 @@ if __name__ == "__main__":
     env = MazeEnv(render_mode="human")  # 使用 MazeEnv 類別
     obs, info = env.reset()
 
+    # 按住方向鍵可連續移動 (手感)
+    pygame.key.set_repeat(180, 110)
+
     print("載入模型中...")
     try:
         # 修改：使用 resource_path 來取得模型路徑
@@ -44,6 +47,7 @@ if __name__ == "__main__":
     print("空白鍵 (Space): 暫停 / 繼續")
     print("右方向鍵 (Right): 暫停時單步執行")
     print("方向鍵 (Up/Down/Left/Right): 移動角色 (HUMAN 模式)")
+    print("H 鍵或畫面右下角 ? 按鈕: 開關遊戲說明")
     print("----------------")
 
     running = True
@@ -57,7 +61,21 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                # 點擊 "?" 按鈕開關遊戲說明
+                btn = env.renderer.help_button_rect
+                if btn and btn.collidepoint(event.pos):
+                    env.renderer.show_help = not env.renderer.show_help
             elif event.type == pygame.KEYDOWN:
+                # H 或 ? 開關說明；說明開啟時 ESC 也可關閉，其餘按鍵忽略
+                if event.key in (pygame.K_h, pygame.K_QUESTION, pygame.K_SLASH):
+                    env.renderer.show_help = not env.renderer.show_help
+                    continue
+                if env.renderer.show_help:
+                    if event.key == pygame.K_ESCAPE:
+                        env.renderer.show_help = False
+                    continue
+
                 if event.key == pygame.K_SPACE:
                     paused = not paused
                     print(f"遊戲{'暫停' if paused else '繼續'}")
@@ -83,10 +101,12 @@ if __name__ == "__main__":
                         human_input_received = True
                 # ------------------------
 
-        # 決定是否執行環境更新
+        # 決定是否執行環境更新 (說明面板開啟時遊戲暫停)
         should_step = False
 
-        if config.PLAYER_MODE == "HUMAN":
+        if env.renderer.show_help:
+            pass
+        elif config.PLAYER_MODE == "HUMAN":
             # 手動模式：只有在收到輸入 (或暫停時的單步除錯) 時才執行
             if human_input_received or (paused and step_this_frame):
                 should_step = True

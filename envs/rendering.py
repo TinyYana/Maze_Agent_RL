@@ -1,5 +1,19 @@
+import math
+
 import pygame
 import config
+
+# 支援中文的字體候選 (Windows 內建)，全部沒有時 SysFont 會回退預設字體
+FONT_NAMES = "microsoftjhengheiui,microsoftjhenghei,msyh,malgungothic,arial"
+
+# 特效顏色 (依 AI 動作類型)
+FX_COLORS = {
+    "wall": (155, 89, 182),  # 紫：蓋牆
+    "monster": (231, 76, 60),  # 紅：放怪
+    "exit": (241, 196, 15),  # 金：搬出口
+    "remove": (46, 204, 113),  # 綠：清除
+    "hammer": (46, 204, 113),  # 綠：玩家破牆
+}
 
 
 class MazeRenderer:
@@ -9,161 +23,357 @@ class MazeRenderer:
         self.fps = fps
         self.window = None
         self.clock = None
-        self.font = None
-        self.ui_height = 60  # 增加 UI 高度
+        self.ui_height = 64
+        self.top_height = 40
+
+        # 互動狀態
+        self.show_help = False
+        self.help_button_rect = None  # 給 main.py 做滑鼠點擊判定
+
+        # 視覺回饋狀態
+        self.effects = []  # [{r, c, ttl, ttl0, color}]
+        self.hit_flash = 0  # 受擊紅閃剩餘幀數
+        self.banner = None  # {text, color, ttl}
+        self.ai_pulse = 0  # AI 行動指示燈亮度
+        self._last_action_seen = None
+        self._player_px = None  # 玩家平滑移動的目前繪製座標
+        self._trail = []  # 玩家移動殘影 [(x, y)]
 
     def init_window(self):
-        if self.window is None:
-            pygame.init()
-            pygame.display.init()
-            pygame.display.set_caption("Maze Agent RL")
+        if self.window is not None:
+            return
+        pygame.init()
+        pygame.display.init()
+        pygame.display.set_caption("Maze Agent RL - PPO Maze Master")
 
-            self.window = pygame.display.set_mode(
-                (self.window_size, self.window_size + self.ui_height)
-            )
-            # 使用更現代的字體，如果沒有則回退到預設
-            try:
-                self.font = pygame.font.Font(
-                    None, 32
-                )  # None 使用系統預設好看的無襯線字體
-            except:
-                self.font = pygame.font.SysFont("Arial", 24)
+        self.total_height = self.top_height + self.window_size + self.ui_height
+        self.window = pygame.display.set_mode((self.window_size, self.total_height))
+        self.font = pygame.font.SysFont(FONT_NAMES, 17)
+        self.font_small = pygame.font.SysFont(FONT_NAMES, 14)
+        self.font_big = pygame.font.SysFont(FONT_NAMES, 30, bold=True)
+        self.clock = pygame.time.Clock()
 
-            self.clock = pygame.time.Clock()
+    # ------------------------------------------------------------------
+    # 外部事件 API (由環境呼叫)
+    # ------------------------------------------------------------------
 
-    def render(self, maze, player_hp, player_hammers, player_steps):
+    def add_effect(self, kind, r=0, c=0):
+        """在格子 (r, c) 加入一個擴散光圈特效；kind='hit' 則為全畫面紅閃"""
+        if kind == "hit":
+            self.hit_flash = 8
+            return
+        self.effects.append(
+            {"r": r, "c": c, "ttl": 14, "ttl0": 14, "color": FX_COLORS.get(kind, (255, 255, 255))}
+        )
+
+    def set_banner(self, text, color):
+        """顯示回合結束橫幅，會自動淡出"""
+        self.banner = {"text": text, "color": color, "ttl": 70}
+
+    # ------------------------------------------------------------------
+    # 主渲染
+    # ------------------------------------------------------------------
+
+    def render(
+        self,
+        maze,
+        player_pos,
+        exit_pos,
+        monsters,
+        player_hp,
+        player_hammers,
+        player_steps,
+        current_time,
+        last_ai_action,
+    ):
         self.init_window()
 
-        # 1. 繪製背景
-        canvas = pygame.Surface((self.window_size, self.window_size + self.ui_height))
+        canvas = pygame.Surface((self.window_size, self.total_height))
         canvas.fill(config.COLOR_BG)
 
-        cell_size = self.window_size / self.grid_size
+        cell = self.window_size / self.grid_size
+        oy = self.top_height  # 迷宮區域的 y 偏移
 
-        # 2. 繪製格線 (淡淡的)
-        for x in range(self.grid_size + 1):
-            pos = x * cell_size
-            pygame.draw.line(
-                canvas, config.COLOR_GRID, (0, pos), (self.window_size, pos), 1
-            )
-            pygame.draw.line(
-                canvas, config.COLOR_GRID, (pos, 0), (pos, self.window_size), 1
-            )
+        # 1. 格線
+        for i in range(self.grid_size + 1):
+            pos = i * cell
+            pygame.draw.line(canvas, config.COLOR_GRID, (0, oy + pos), (self.window_size, oy + pos), 1)
+            pygame.draw.line(canvas, config.COLOR_GRID, (pos, oy), (pos, oy + self.window_size), 1)
 
-        # 3. 繪製迷宮物件
+        # 2. 牆壁 (maze 只含靜態地形)
         for r in range(self.grid_size):
             for c in range(self.grid_size):
-                cell_value = maze[r, c]
-                # 注意：pygame 座標是 (x, y) 對應 (col, row)
-                x_pos = c * cell_size
-                y_pos = r * cell_size
+                if maze[r, c] == config.ID_WALL:
+                    self._draw_wall(canvas, c * cell, oy + r * cell, cell)
 
-                if cell_value == config.ID_WALL:
-                    self._draw_wall(canvas, x_pos, y_pos, cell_size)
-                elif cell_value == config.ID_EXIT:
-                    self._draw_exit(canvas, x_pos, y_pos, cell_size)
-                elif cell_value == config.ID_MONSTER:
-                    self._draw_monster(canvas, x_pos, y_pos, cell_size)
-                # 玩家最後畫，確保他在最上層
+        # 3. 實體分層繪製：出口 -> 怪物 -> 玩家 (重疊時全部可見)
+        self._draw_exit(canvas, exit_pos[1] * cell, oy + exit_pos[0] * cell, cell)
+        for i, m in enumerate(monsters):
+            self._draw_monster(canvas, m[1] * cell, oy + m[0] * cell, cell, idx=i)
+        self._draw_player_smooth(canvas, player_pos, cell, oy)
 
-        # 4. 繪製玩家 (獨立迴圈確保不被遮擋)
-        for r in range(self.grid_size):
-            for c in range(self.grid_size):
-                if maze[r, c] == config.ID_PLAYER:
-                    x_pos = c * cell_size
-                    y_pos = r * cell_size
-                    self._draw_player(canvas, x_pos, y_pos, cell_size)
+        # 4. 特效層 (半透明)
+        self._draw_effects(canvas, cell, oy)
 
-        # 5. 繪製 UI
-        self._draw_ui(canvas, player_hp, player_hammers, player_steps)
+        # 5. 頂部 AI 狀態列 + 底部資訊列
+        self._draw_top_bar(canvas, last_ai_action)
+        self._draw_ui(canvas, player_hp, player_hammers, player_steps, current_time)
 
-        # 更新畫面
-        self.window.blit(canvas, canvas.get_rect())
+        # 6. 回合結束橫幅與教學面板
+        self._draw_banner(canvas, oy)
+        if self.show_help:
+            self._draw_help(canvas)
+
+        self.window.blit(canvas, (0, 0))
         pygame.event.pump()
         pygame.display.update()
         self.clock.tick(self.fps)
 
-    def _draw_wall(self, canvas, x, y, size):
-        """繪製有立體感的牆壁"""
-        # 底部陰影
-        rect = pygame.Rect(x, y, size, size)
-        pygame.draw.rect(canvas, config.COLOR_WALL_SIDE, rect)
+    # ------------------------------------------------------------------
+    # 各元件
+    # ------------------------------------------------------------------
 
-        # 頂部亮面 (稍微縮小並上移一點點，製造厚度感)
-        offset = 4
+    def _draw_wall(self, canvas, x, y, size):
+        pygame.draw.rect(canvas, config.COLOR_WALL_SIDE, pygame.Rect(x, y, size, size))
         top_rect = pygame.Rect(x + 2, y + 2, size - 4, size - 4)
         pygame.draw.rect(canvas, config.COLOR_WALL_TOP, top_rect, border_radius=3)
 
-    def _draw_player(self, canvas, x, y, size):
-        """繪製圓形玩家"""
-        center = (x + size / 2, y + size / 2)
-        radius = size / 2 - 4
+    def _draw_shadow(self, canvas, cx, cy, size):
+        """實體腳下的柔和橢圓陰影"""
+        shadow = pygame.Surface((size, size // 2), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 70), shadow.get_rect())
+        canvas.blit(shadow, (cx - size / 2, cy + size / 4))
 
-        # 外框
+    def _draw_player_smooth(self, canvas, player_pos, cell, oy):
+        """玩家位置用插值平滑移動 + 殘影，增加手感"""
+        target = (player_pos[1] * cell + cell / 2, oy + player_pos[0] * cell + cell / 2)
+
+        if self._player_px is None:
+            self._player_px = list(target)
+        dx = target[0] - self._player_px[0]
+        dy = target[1] - self._player_px[1]
+        # 距離太遠 (重生/瞬移) 直接貼齊，避免滑過整張地圖
+        if abs(dx) > cell * 3 or abs(dy) > cell * 3:
+            self._player_px = list(target)
+            self._trail.clear()
+        else:
+            self._player_px[0] += dx * 0.45
+            self._player_px[1] += dy * 0.45
+
+        center = (self._player_px[0], self._player_px[1])
+        radius = cell / 2 - 4
+
+        # 移動殘影 (只在移動時累積)
+        if not self._trail or (abs(center[0] - self._trail[-1][0]) + abs(center[1] - self._trail[-1][1])) > 1.5:
+            self._trail.append(tuple(center))
+            if len(self._trail) > 8:
+                self._trail.pop(0)
+        if len(self._trail) > 1:
+            ghost = pygame.Surface((self.window_size, self.total_height), pygame.SRCALPHA)
+            n = len(self._trail)
+            for i, (tx, ty) in enumerate(self._trail[:-1]):
+                alpha = int(60 * (i + 1) / n)
+                r = radius * (0.35 + 0.4 * (i + 1) / n)
+                pygame.draw.circle(ghost, (*config.COLOR_PLAYER_BODY, alpha), (tx, ty), r)
+            canvas.blit(ghost, (0, 0))
+
+        self._draw_shadow(canvas, center[0], center[1], cell * 0.8)
         pygame.draw.circle(canvas, config.COLOR_PLAYER_BORDER, center, radius)
-        # 內體
         pygame.draw.circle(canvas, config.COLOR_PLAYER_BODY, center, radius - 3)
+        # 光澤高光
+        pygame.draw.circle(
+            canvas, (170, 220, 250),
+            (center[0] - radius * 0.35, center[1] - radius * 0.35), radius * 0.22,
+        )
 
-    def _draw_monster(self, canvas, x, y, size):
-        """繪製怪物 (菱形或帶眼睛的圓)"""
-        center = (x + size / 2, y + size / 2)
+    def _draw_monster(self, canvas, x, y, size, idx=0):
+        # 上下浮動動畫 (每隻相位錯開)
+        bob = math.sin(pygame.time.get_ticks() / 250 + idx * 1.7) * size * 0.06
+        center = (x + size / 2, y + size / 2 + bob)
         radius = size / 2 - 4
 
-        # 身體
+        self._draw_shadow(canvas, x + size / 2, y + size / 2, size * 0.8)
         pygame.draw.circle(canvas, config.COLOR_MONSTER_BODY, center, radius)
-
-        # 眼睛 (兇狠感)
-        eye_offset_x = radius / 2.5
-        eye_offset_y = radius / 4
-        pygame.draw.circle(
-            canvas,
-            config.COLOR_MONSTER_EYE,
-            (center[0] - eye_offset_x, center[1] - eye_offset_y),
-            3,
-        )
-        pygame.draw.circle(
-            canvas,
-            config.COLOR_MONSTER_EYE,
-            (center[0] + eye_offset_x, center[1] - eye_offset_y),
-            3,
-        )
+        # 頂部亮面
+        pygame.draw.circle(canvas, (250, 130, 115), (center[0], center[1] - radius * 0.3), radius * 0.55)
+        pygame.draw.circle(canvas, config.COLOR_MONSTER_BODY, (center[0], center[1] - radius * 0.15), radius * 0.6)
+        eye_dx = radius / 2.5
+        eye_dy = radius / 4
+        pygame.draw.circle(canvas, config.COLOR_MONSTER_EYE, (center[0] - eye_dx, center[1] - eye_dy), 3.5)
+        pygame.draw.circle(canvas, config.COLOR_MONSTER_EYE, (center[0] + eye_dx, center[1] - eye_dy), 3.5)
 
     def _draw_exit(self, canvas, x, y, size):
-        """繪製出口 (同心正方形)"""
-        center_x = x + size / 2
-        center_y = y + size / 2
+        # 脈動光暈 (傳送門感)
+        pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 320)
+        cx, cy = x + size / 2, y + size / 2
+        glow = pygame.Surface((size * 2, size * 2), pygame.SRCALPHA)
+        for ratio, alpha in ((1.0, 22), (0.8, 34), (0.62, 48)):
+            a = int(alpha * (0.6 + 0.4 * pulse))
+            pygame.draw.circle(glow, (*config.COLOR_EXIT_OUTER, a), (size, size), size * ratio)
+        canvas.blit(glow, (cx - size, cy - size))
 
-        # 外圈
         rect_outer = pygame.Rect(x + 4, y + 4, size - 8, size - 8)
-        pygame.draw.rect(canvas, config.COLOR_EXIT_OUTER, rect_outer, border_radius=4)
+        pygame.draw.rect(canvas, config.COLOR_EXIT_OUTER, rect_outer, border_radius=6)
+        inset = 10 - 2 * pulse
+        rect_inner = pygame.Rect(x + inset, y + inset, size - inset * 2, size - inset * 2)
+        pygame.draw.rect(canvas, config.COLOR_EXIT_INNER, rect_inner, border_radius=4)
 
-        # 內圈
-        rect_inner = pygame.Rect(x + 10, y + 10, size - 20, size - 20)
-        pygame.draw.rect(canvas, config.COLOR_EXIT_INNER, rect_inner, border_radius=2)
+    def _draw_effects(self, canvas, cell, oy):
+        if not self.effects and self.hit_flash <= 0:
+            return
+        overlay = pygame.Surface((self.window_size, self.total_height), pygame.SRCALPHA)
 
-    def _draw_ui(self, canvas, hp, hammers, steps):
-        # 繪製底部深色面板
-        ui_rect = pygame.Rect(0, self.window_size, self.window_size, self.ui_height)
-        pygame.draw.rect(canvas, config.COLOR_UI_BG, ui_rect)
+        for e in self.effects:
+            t = 1 - e["ttl"] / e["ttl0"]  # 0 -> 1
+            cx = e["c"] * cell + cell / 2
+            cy = oy + e["r"] * cell + cell / 2
+            radius = cell * (0.3 + 0.55 * t)
+            alpha = int(200 * (1 - t))
+            pygame.draw.circle(overlay, (*e["color"], alpha), (cx, cy), radius, 3)
+            e["ttl"] -= 1
+        self.effects = [e for e in self.effects if e["ttl"] > 0]
 
-        # 準備文字
-        # 使用 Emoji 或簡單符號來增加視覺趣味
-        hp_text = f"♥ HP: {hp}/{config.PLAYER_MAX_HP}"
-        hammer_text = f"⚒ Hammer: {hammers}"
-        step_text = f"👣 Steps: {steps}"
+        if self.hit_flash > 0:
+            alpha = int(110 * self.hit_flash / 8)
+            pygame.draw.rect(
+                overlay, (231, 76, 60, alpha),
+                pygame.Rect(0, oy, self.window_size, self.window_size), 12,
+            )
+            self.hit_flash -= 1
 
-        # 繪製文字 (加上陰影效果)
-        padding = 20
-        section_width = self.window_size / 3
+        canvas.blit(overlay, (0, 0))
 
-        labels = [hp_text, hammer_text, step_text]
+    def _draw_top_bar(self, canvas, last_ai_action):
+        pygame.draw.rect(canvas, config.COLOR_UI_BG, pygame.Rect(0, 0, self.window_size, self.top_height))
 
-        for i, text in enumerate(labels):
-            text_surf = self.font.render(text, True, config.COLOR_TEXT)
-            # 簡單的置中計算
-            x_pos = i * section_width + (section_width - text_surf.get_width()) / 2
-            y_pos = self.window_size + (self.ui_height - text_surf.get_height()) / 2
-            canvas.blit(text_surf, (x_pos, y_pos))
+        # AI 行動指示燈：動作改變時閃亮
+        if last_ai_action != self._last_action_seen:
+            self._last_action_seen = last_ai_action
+            self.ai_pulse = 12
+        pulse = self.ai_pulse / 12
+        self.ai_pulse = max(0, self.ai_pulse - 1)
+        glow = (int(155 + 100 * pulse), int(89 + 100 * pulse), int(182 + 60 * pulse))
+        pygame.draw.circle(canvas, glow, (20, self.top_height // 2), 6 + int(3 * pulse))
+
+        title = self.font.render("Maze Master · PPO 強化學習", True, config.COLOR_TEXT)
+        canvas.blit(title, (36, (self.top_height - title.get_height()) // 2))
+
+        action = self.font_small.render(f"AI 決策：{last_ai_action}", True, (150, 160, 178))
+        canvas.blit(action, (self.window_size - action.get_width() - 14, (self.top_height - action.get_height()) // 2))
+
+        # 紫色點綴分隔線 (Maze Master 主題色)
+        pygame.draw.line(canvas, config.COLOR_ACCENT, (0, self.top_height - 2), (self.window_size, self.top_height - 2), 2)
+
+    def _draw_heart(self, canvas, cx, cy, r, color):
+        pygame.draw.circle(canvas, color, (int(cx - r / 2), int(cy - r / 4)), int(r / 2) + 1)
+        pygame.draw.circle(canvas, color, (int(cx + r / 2), int(cy - r / 4)), int(r / 2) + 1)
+        pygame.draw.polygon(
+            canvas, color,
+            [(cx - r, cy - r / 5), (cx + r, cy - r / 5), (cx, cy + r)],
+        )
+
+    def _draw_hammer(self, canvas, x, y, color):
+        pygame.draw.rect(canvas, color, pygame.Rect(x, y, 16, 7), border_radius=2)  # 鎚頭
+        pygame.draw.rect(canvas, color, pygame.Rect(x + 6, y + 6, 4, 12), border_radius=1)  # 握柄
+
+    def _draw_ui(self, canvas, hp, hammers, steps, current_time):
+        y0 = self.top_height + self.window_size
+        pygame.draw.rect(canvas, config.COLOR_UI_BG, pygame.Rect(0, y0, self.window_size, self.ui_height))
+        pygame.draw.line(canvas, config.COLOR_ACCENT, (0, y0), (self.window_size, y0), 2)
+        cy = y0 + self.ui_height // 2
+
+        # HP 愛心
+        for i in range(config.PLAYER_MAX_HP):
+            color = config.COLOR_MONSTER_BODY if i < hp else (58, 66, 84)
+            self._draw_heart(canvas, 26 + i * 28, cy, 10, color)
+
+        # 破牆鎚
+        self._draw_hammer(canvas, 120, cy - 9, (241, 196, 15))
+        hammer_text = self.font.render(f"× {hammers}", True, config.COLOR_TEXT)
+        canvas.blit(hammer_text, (142, cy - hammer_text.get_height() // 2))
+
+        # 心流節奏條：顯示 AI 的目標區間 (TIME_MIN ~ TIME_MAX 步)
+        bar_x, bar_w, bar_h = 210, 240, 10
+        bar_y = cy + 2
+        total = config.TIME_MAX * 1.5  # 超時上限
+        label = self.font_small.render(
+            f"節奏 {current_time} 步｜AI 目標 {config.TIME_MIN}–{config.TIME_MAX} 步", True, (189, 195, 199)
+        )
+        canvas.blit(label, (bar_x, bar_y - label.get_height() - 4))
+
+        pygame.draw.rect(canvas, (75, 90, 105), pygame.Rect(bar_x, bar_y, bar_w, bar_h), border_radius=5)
+        zone_x = bar_x + bar_w * config.TIME_MIN / total
+        zone_w = bar_w * (config.TIME_MAX - config.TIME_MIN) / total
+        pygame.draw.rect(canvas, (39, 174, 96), pygame.Rect(zone_x, bar_y, zone_w, bar_h), border_radius=5)
+        marker_x = bar_x + bar_w * min(current_time, total) / total
+        pygame.draw.rect(canvas, config.COLOR_TEXT, pygame.Rect(marker_x - 2, bar_y - 3, 4, bar_h + 6), border_radius=2)
+
+        # 說明按鈕 "?"
+        btn_cx, btn_r = self.window_size - 30, 15
+        self.help_button_rect = pygame.Rect(btn_cx - btn_r, cy - btn_r, btn_r * 2, btn_r * 2)
+        pygame.draw.circle(canvas, (52, 152, 219), (btn_cx, cy), btn_r)
+        qmark = self.font.render("?", True, config.COLOR_TEXT)
+        canvas.blit(qmark, (btn_cx - qmark.get_width() // 2, cy - qmark.get_height() // 2))
+
+    def _draw_banner(self, canvas, oy):
+        if not self.banner:
+            return
+        t = self.banner["ttl"] / 70
+        alpha = int(230 * min(1.0, t * 3))  # 最後 1/3 淡出
+
+        text = self.font_big.render(self.banner["text"], True, (255, 255, 255))
+        pad = 24
+        w, h = text.get_width() + pad * 2, text.get_height() + pad
+        x = (self.window_size - w) // 2
+        y = oy + self.window_size // 2 - h // 2
+
+        panel = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(panel, (*self.banner["color"], alpha), panel.get_rect(), border_radius=12)
+        panel.blit(text, (pad, pad // 2))
+        canvas.blit(panel, (x, y))
+
+        self.banner["ttl"] -= 1
+        if self.banner["ttl"] <= 0:
+            self.banner = None
+
+    HELP_LINES = [
+        "你（藍色圓點）要走到金色出口。",
+        "對手「Maze Master」是一個 PPO 強化學習模型，",
+        "牠每回合會即時改造迷宮：蓋牆、搬移出口、放出怪物。",
+        "",
+        "AI 的訓練目標不是困死你，而是控制你的節奏：",
+        "讓你在 50～100 步之間抵達出口（心流區間），",
+        "太快或太慢，AI 在訓練時都會被扣分。",
+        "",
+        "操作方式",
+        "   方向鍵　移動（撞牆時自動消耗破牆鎚 ×1）",
+        "   空白鍵　暫停 / 繼續　　（暫停時 → 鍵單步）",
+        "   H 或 ?　開關本說明",
+        "",
+        "下方節奏條顯示你的步數是否落在 AI 的綠色目標區間。",
+    ]
+
+    def _draw_help(self, canvas):
+        overlay = pygame.Surface((self.window_size, self.total_height), pygame.SRCALPHA)
+        overlay.fill((20, 25, 35, 200))
+
+        line_h = 26
+        pad = 28
+        panel_w = self.window_size - 90
+        panel_h = pad * 2 + 44 + len(self.HELP_LINES) * line_h
+        px = (self.window_size - panel_w) // 2
+        py = (self.total_height - panel_h) // 2
+
+        pygame.draw.rect(overlay, (44, 62, 80, 245), pygame.Rect(px, py, panel_w, panel_h), border_radius=14)
+
+        title = self.font_big.render("遊戲說明", True, (241, 196, 15))
+        overlay.blit(title, (px + pad, py + pad - 6))
+
+        for i, line in enumerate(self.HELP_LINES):
+            surf = self.font.render(line, True, config.COLOR_TEXT)
+            overlay.blit(surf, (px + pad, py + pad + 44 + i * line_h))
+
+        canvas.blit(overlay, (0, 0))
 
     def close(self):
         if self.window is not None:

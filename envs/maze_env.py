@@ -50,6 +50,14 @@ class MazeEnv(gym.Env):
         # 手動操作變數
         self.manual_move = (0, 0)
 
+        # 給渲染器顯示的 AI 決策描述
+        self.last_ai_action = "等待第一步"
+
+        # 玩家個性與行為統計 (實際值於 reset 設定)
+        self.player_randomness = config.AI_RANDOMNESS
+        self.player_hesitate_prob = 0.0
+        self.action_counts = {"wall": 0, "monster": 0, "exit": 0, "remove": 0, "skip": 0}
+
         # === 新增：允許的動作列表 (預設全部允許) ===
         # 0: Skip, 1: Wall, 2: Remove, 3: Exit, 4: Monster
         self.allowed_actions = {0, 1, 2, 3, 4}
@@ -94,12 +102,23 @@ class MazeEnv(gym.Env):
         if status_info:
             info.update(status_info)
 
+        # 回合結束時顯示結果橫幅
+        if terminated and self.render_mode == "human":
+            banner_map = {
+                "died": ("你被怪物擊倒了", (192, 57, 43)),
+                "blocked": ("路徑被堵死", (192, 57, 43)),
+                "flow_success": ("完美通關！落在 AI 目標區間", (39, 174, 96)),
+                "too_fast": ("通關 — 但比 AI 預期更快", (211, 158, 15)),
+                "too_slow": ("通關 — 但比 AI 預期更慢", (211, 158, 15)),
+                "timeout": ("超時了", (127, 140, 141)),
+            }
+            text, color = banner_map.get(info.get("result"), ("回合結束", (127, 140, 141)))
+            self.renderer.set_banner(text, color)
+
         # 觀測與渲染
         obs = self._get_obs()
         if self.render_mode == "human":
-            self.renderer.render(
-                self.maze, self.player_hp, self.player_hammers, self.player_steps
-            )
+            self.render()
 
         return obs, total_reward, terminated, truncated, info
 
@@ -110,20 +129,16 @@ class MazeEnv(gym.Env):
     def _execute_maze_master_actions(self, action):
         """解析並執行編輯動作"""
         reward = 0
-        # 計算動作前的路徑長度 (作為基準)
-        old_path = astar_path(self.maze, self.player_pos, self.exit_pos)
-        self.old_path_len = len(old_path) if old_path else 0
-
         reshaped_actions = action.reshape(config.ACTIONS_PER_TURN, 3)
         for act in reshaped_actions:
             x, y, action_type = act
             reward += self._apply_single_action(x, y, action_type)
-
-        # 確保標記正確 (防止被覆蓋)
-        self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
-        self.maze[self.exit_pos[0], self.exit_pos[1]] = config.ID_EXIT
-
         return reward
+
+    def _fx(self, kind, x=0, y=0):
+        """轉送視覺特效事件給渲染器 (僅人眼模式，訓練時不累積)"""
+        if self.render_mode == "human":
+            self.renderer.add_effect(kind, x, y)
 
     def _action_place_wall(self, x, y):
         """改進版放牆邏輯：增加更細緻的獎勵"""
@@ -139,8 +154,12 @@ class MazeEnv(gym.Env):
 
         if new_path is None:
             self.maze[x, y] = config.ID_EMPTY  # 撤銷
+            self.last_ai_action = f"想堵死路徑 ({x}, {y}) → 被規則撤銷"
             return config.REWARD_BLOCKED
 
+        self._fx("wall", x, y)
+        self.last_ai_action = f"蓋牆 ({x}, {y})"
+        self.action_counts["wall"] += 1
         new_len = len(new_path)
         reward = config.REWARD_BUILD_WALL
 
@@ -170,11 +189,15 @@ class MazeEnv(gym.Env):
 
         # action_type == 0 表示不做事
         if action_type == 0:
+            self.last_ai_action = "按兵不動"
+            self.action_counts["skip"] += 1
             return config.REWARD_SKIP_ACTION
 
-        # 保護機制：除非是移除動作，否則不能覆蓋非空格子
-        current_cell = self.maze[x, y]
-        if current_cell != config.ID_EMPTY and action_type != 2:
+        # 保護機制：除非是移除動作，否則不能覆蓋非空格子 (牆或怪物)
+        occupied = self.maze[x, y] != config.ID_EMPTY or any(
+            m[0] == x and m[1] == y for m in self.monsters
+        )
+        if occupied and action_type != 2:
             return config.REWARD_SKIP_ACTION
 
         if action_type == 1:
@@ -192,32 +215,32 @@ class MazeEnv(gym.Env):
         return astar_path(self.maze, self.player_pos, self.exit_pos) is None
 
     def _action_remove(self, x, y):
-        if self.maze[x, y] == config.ID_MONSTER:
-            self._remove_monster_at(x, y)
+        self._remove_monster_at(x, y)
         self.maze[x, y] = config.ID_EMPTY
+        self._fx("remove", x, y)
+        self.last_ai_action = f"清除格子 ({x}, {y})"
+        self.action_counts["remove"] += 1
         return 0
 
     def _action_move_exit(self, x, y):
         old_exit_pos = self.exit_pos.copy()
-        old_cell_value = self.maze[x, y]
-
-        # 移動出口
-        self.maze[old_exit_pos[0], old_exit_pos[1]] = config.ID_EMPTY
         self.exit_pos = np.array([x, y], dtype=np.int32)
-        self.maze[x, y] = config.ID_EXIT
 
         if self._is_path_blocked():
-            # 撤銷
-            self.maze[x, y] = old_cell_value
-            self.exit_pos = old_exit_pos
-            self.maze[old_exit_pos[0], old_exit_pos[1]] = config.ID_EXIT
+            self.exit_pos = old_exit_pos  # 撤銷
             return config.REWARD_BLOCKED
+
+        self._fx("exit", x, y)
+        self.last_ai_action = f"搬移出口 → ({x}, {y})"
+        self.action_counts["exit"] += 1
         return config.REWARD_MOVE_EXIT
 
     def _action_place_monster(self, x, y):
         if len(self.monsters) < config.MAX_MONSTERS:
-            self.maze[x, y] = config.ID_MONSTER
             self.monsters.append([x, y])
+            self._fx("monster", x, y)
+            self.last_ai_action = f"放出怪物 ({x}, {y})"
+            self.action_counts["monster"] += 1
         return 0
 
     # =========================================================================
@@ -230,20 +253,17 @@ class MazeEnv(gym.Env):
 
         # 如果是 AI 模式，或者雖然是 Human 模式但需要導航輔助
         if config.PLAYER_MODE == "AI":
-            # 在這裡傳入 randomness 參數
+            # 猶豫：模擬真實玩家停下來思考 (該回合不移動，Maze Master 仍可編輯)
+            if self.rng.random() < self.player_hesitate_prob:
+                return 0, False, {}
+
             path = astar_path(
                 self.maze,
                 self.player_pos,
                 self.exit_pos,
-                randomness=config.AI_RANDOMNESS,
+                randomness=self.player_randomness,
             )
-
-            if path is None:
-                # 找不到路徑 (被堵死)
-                return self._move_ai_player(path)
-            else:
-                # 讓 AI 移動
-                return self._move_ai_player(path)
+            return self._move_ai_player(path)
 
         elif config.PLAYER_MODE == "HUMAN":
             # 人類操作邏輯...
@@ -273,6 +293,7 @@ class MazeEnv(gym.Env):
             if hit_count > 0:
                 self.player_hp -= hit_count
                 reward += config.REWARD_HIT * hit_count
+                self._fx("hit")
 
             # 更新位置
             self._update_player_position(path[steps_this_turn])
@@ -302,6 +323,7 @@ class MazeEnv(gym.Env):
         elif target_cell == config.ID_WALL and self.player_hammers > 0:
             self.player_hammers -= 1
             self.maze[new_x, new_y] = config.ID_EMPTY
+            self._fx("hammer", new_x, new_y)
             moved = True
             print(f"使用了破牆工具！剩餘次數: {self.player_hammers}")
 
@@ -313,15 +335,8 @@ class MazeEnv(gym.Env):
         return 0, False, {}
 
     def _update_player_position(self, new_pos):
-        """更新玩家座標並處理地圖標記"""
-        # 清除舊位置 (如果是出口則保留出口標記)
-        if not np.array_equal(self.player_pos, self.exit_pos):
-            self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_EMPTY
-        else:
-            self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_EXIT
-
+        """更新玩家座標 (實體與地形分離，不再寫入 maze 格子)"""
         self.player_pos = np.array(new_pos)
-        self.maze[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
 
     def _check_path_collision(self, path_segment):
         """檢查 AI 移動路徑上是否會撞到怪物"""
@@ -348,33 +363,15 @@ class MazeEnv(gym.Env):
     # =========================================================================
 
     def _move_monsters(self):
-        """所有怪物使用 A* 向玩家移動"""
+        """所有怪物使用 A* 向玩家移動 (maze 只含地形，可直接尋路)"""
         new_monster_positions = []
 
         for m_pos in self.monsters:
-            mx, my = m_pos
-            self.maze[mx, my] = config.ID_EMPTY  # 暫時清除以便尋路
-
             path = astar_path(self.maze, m_pos, self.player_pos)
-
             if path and len(path) > 1:
-                next_step = path[1]
-                nx, ny = next_step
-                # 簡單檢查：不走進牆壁
-                if self.maze[nx, ny] != config.ID_WALL:
-                    new_pos = [nx, ny]
-                else:
-                    new_pos = [mx, my]
+                new_monster_positions.append(list(path[1]))
             else:
-                new_pos = [mx, my]
-
-            new_monster_positions.append(new_pos)
-
-            # 更新地圖標記 (不覆蓋玩家或出口)
-            if not np.array_equal(new_pos, self.player_pos) and not np.array_equal(
-                new_pos, self.exit_pos
-            ):
-                self.maze[new_pos[0], new_pos[1]] = config.ID_MONSTER
+                new_monster_positions.append(list(m_pos))
 
         self.monsters = new_monster_positions
 
@@ -393,6 +390,7 @@ class MazeEnv(gym.Env):
 
         if hit:
             self.player_hp -= 1
+            self._fx("hit")
             # 這裡不回傳獎勵，因為通常是 AI 移動時主動撞怪才給獎勵，
             # 或是怪物移動後撞到玩家。這裡可以視需求增加被動受傷的獎勵。
             return config.REWARD_HIT
@@ -444,9 +442,18 @@ class MazeEnv(gym.Env):
     # 輔助函式
     # =========================================================================
 
+    def _entity_grid(self):
+        """將實體 (怪物/出口/玩家) 疊合到地形上，優先序：玩家 > 出口 > 怪物"""
+        grid = self.maze.copy()
+        for m in self.monsters:
+            grid[m[0], m[1]] = config.ID_MONSTER
+        grid[self.exit_pos[0], self.exit_pos[1]] = config.ID_EXIT
+        grid[self.player_pos[0], self.player_pos[1]] = config.ID_PLAYER
+        return grid
+
     def _get_obs(self):
         """產生觀測值"""
-        obs = self.maze.astype(np.uint8)
+        obs = self._entity_grid().astype(np.uint8)
         obs = obs * 50
         obs = np.repeat(
             np.repeat(obs, self.scale_factor, axis=0), self.scale_factor, axis=1
@@ -459,10 +466,10 @@ class MazeEnv(gym.Env):
         if seed is not None:
             self.rng = np.random.default_rng(seed)
 
+        # maze 只保存地形 (牆/空地)，實體另外用座標追蹤
         self.maze = MazeGenerator.generate(self.grid_size, self.rng)
 
         self.player_pos = np.array([0, 0], dtype=np.int32)
-        self.maze[0, 0] = config.ID_PLAYER
         self.current_time = 0
         self.player_steps = 0
         self.player_hp = config.PLAYER_MAX_HP
@@ -471,20 +478,37 @@ class MazeEnv(gym.Env):
         self.exit_pos = np.array(
             [self.grid_size - 1, self.grid_size - 1], dtype=np.int32
         )
-        self.maze[-1, -1] = config.ID_EXIT
         self.monsters = []
+        self.last_ai_action = "等待第一步"
+
+        # 玩家個性：固定值 (demo/評估) 或每回合隨機抽樣 (訓練泛化)
+        if config.PLAYER_PROFILE_RANDOMIZE:
+            self.player_randomness = self.rng.uniform(*config.PLAYER_RANDOMNESS_RANGE)
+            self.player_hesitate_prob = self.rng.uniform(*config.PLAYER_HESITATE_RANGE)
+        else:
+            self.player_randomness = config.AI_RANDOMNESS
+            self.player_hesitate_prob = 0.0
+
+        # Maze Master 行為統計 (供動態調整分析用)
+        self.action_counts = {"wall": 0, "monster": 0, "exit": 0, "remove": 0, "skip": 0}
 
         if self.render_mode == "human":
-            self.renderer.render(
-                self.maze, self.player_hp, self.player_hammers, self.player_steps
-            )
+            self.render()
 
         return self._get_obs(), {}
 
     def render(self):
         if self.render_mode == "human":
             self.renderer.render(
-                self.maze, self.player_hp, self.player_hammers, self.player_steps
+                self.maze,
+                self.player_pos,
+                self.exit_pos,
+                self.monsters,
+                self.player_hp,
+                self.player_hammers,
+                self.player_steps,
+                self.current_time,
+                self.last_ai_action,
             )
 
     def close(self):
