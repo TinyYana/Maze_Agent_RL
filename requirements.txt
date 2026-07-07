@@ -44,6 +44,8 @@ stable_baselines3==2.7.0
 sympy==1.14.0
 tensorboard==2.20.0
 tensorboard-data-server==0.7.2
+# Windows + NVIDIA GPU 注意：PyPI 預設裝 CPU 版 torch，訓練會極慢。
+# 請改用: pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu128 --force-reinstall --no-deps
 torch==2.9.1
 tqdm==4.67.1
 typing_extensions==4.15.0

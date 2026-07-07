@@ -3,10 +3,28 @@ import numpy as np
 import datetime  # 新增：用於產生時間戳記
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.vec_env import SubprocVecEnv
 from envs.maze_env import MazeEnv
 
 # 記得確保 config 有被引入
 import config
+
+
+def make_env(rank):
+    """建立單一訓練環境 (供 SubprocVecEnv 子進程呼叫)"""
+
+    def _init():
+        # 子進程有自己的 config 模組，需在此設定
+        config.PLAYER_MODE = "AI"
+        config.PLAYER_PROFILE_RANDOMIZE = True
+        env = MazeEnv(render_mode=None)
+        # 每個環境用不同種子，避免所有進程產生一模一樣的迷宮序列
+        env.rng = np.random.default_rng(114514 + rank)
+        # Monitor 包裝讓 TensorBoard 記錄 ep_rew_mean / ep_len_mean
+        return Monitor(env)
+
+    return _init
 
 
 # --- 新增：自定義 Callback 用來存 AI 看到的圖 ---
@@ -94,10 +112,12 @@ def train():
     os.makedirs(debug_img_dir, exist_ok=True)
     os.makedirs(models_dir, exist_ok=True)
 
-    # 3. 建立環境
-    env = MazeEnv(render_mode=None)
+    # 3. 建立環境 (多進程並行收集 + 每回合隨機抽玩家個性，避免只會對付完美 A*)
+    # 環境步進是純 Python A* 運算 (CPU 瓶頸)，SubprocVecEnv 可線性加速資料收集
+    n_envs = min(8, os.cpu_count() or 4)
+    env = SubprocVecEnv([make_env(i) for i in range(n_envs)])
 
-    # 4. 定義模型
+    # 4. 定義模型 (n_steps 除以環境數，維持每次更新的總 rollout 量 4096 不變)
     model = PPO(
         "CnnPolicy",
         env,
@@ -106,7 +126,7 @@ def train():
         batch_size=256,
         ent_coef=0.1,
         gamma=0.99,
-        n_steps=4096,
+        n_steps=max(4096 // n_envs, 64),
         clip_range=0.2,
         gae_lambda=0.95,
         device="auto",
@@ -124,7 +144,15 @@ def train():
 
     total_timesteps = int(os.getenv("TRAIN_TIMESTEPS", "500000"))
 
+    import torch
+
     print(f"=== 開始訓練: {run_name} ===")
+    print(f"運算裝置: {model.device} (torch {torch.__version__}, CUDA 可用: {torch.cuda.is_available()})")
+    if not torch.cuda.is_available():
+        print("⚠️ 未偵測到 CUDA！將使用 CPU 訓練 (慢)。請安裝 GPU 版 torch:")
+        print("   pip install torch --index-url https://download.pytorch.org/whl/cu128 --force-reinstall --no-deps")
+    print(f"並行環境數: {n_envs} (SubprocVecEnv)")
+    print(f"玩家個性隨機化: True (繞路 {config.PLAYER_RANDOMNESS_RANGE}, 猶豫 {config.PLAYER_HESITATE_RANGE})")
     print(f"Entropy Coef: {model.ent_coef}")
     print(f"AI 視野圖將儲存於: {debug_img_dir}")
     print(f"訓練步數: {total_timesteps}")
@@ -145,6 +173,7 @@ def train():
     backup_model_path = os.path.join(models_dir, f"maze_master_ppo_{run_name}")
     model.save(backup_model_path)
 
+    env.close()
     print("訓練完成！")
     print(f"主要模型已更新: {default_model_path}.zip")
     print(f"歷史備份已存檔: {backup_model_path}.zip")
