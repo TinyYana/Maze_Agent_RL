@@ -3,7 +3,8 @@ import numpy as np
 # --- 環境設定 ---
 GRID_SIZE = 15
 WINDOW_SIZE = 600
-FPS = 15
+FPS = 60  # 畫面更新率，同時決定事件輪詢頻率 (直接影響按鍵手感)
+AI_STEP_FPS = 12  # AI 模式每秒推進的步數，與畫面更新率脫鉤
 
 # --- 遊戲機制 ---
 PLAYER_MAX_HP = 3

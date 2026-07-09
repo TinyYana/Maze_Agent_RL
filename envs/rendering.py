@@ -3,8 +3,16 @@ import math
 import pygame
 import config
 
-# 支援中文的字體候選 (Windows 內建)，全部沒有時 SysFont 會回退預設字體
-FONT_NAMES = "microsoftjhengheiui,microsoftjhenghei,msyh,malgungothic,arial"
+# 中文字型候選：三個平台的內建字型都列出來，SysFont 會挑第一個系統裡找得到的。
+# 順序決定優先權，最後的 Arial 只是 ASCII 保底 (它沒有中文字符，會顯示成豆腐框)。
+FONT_NAMES = ",".join(
+    [
+        "Microsoft JhengHei UI", "Microsoft JhengHei", "Microsoft YaHei",  # Windows
+        "PingFang TC", "Heiti TC", "Hiragino Sans GB", "Arial Unicode MS", "STHeiti",  # macOS
+        "Noto Sans CJK TC", "Noto Sans TC", "WenQuanYi Micro Hei",  # Linux
+        "Arial",
+    ]
+)
 
 # 特效顏色 (依 AI 動作類型)
 FX_COLORS = {
@@ -13,6 +21,7 @@ FX_COLORS = {
     "exit": (241, 196, 15),  # 金：搬出口
     "remove": (46, 204, 113),  # 綠：清除
     "hammer": (46, 204, 113),  # 綠：玩家破牆
+    "bump": (120, 130, 150),  # 灰：撞牆但沒有破牆鎚
 }
 
 
@@ -30,14 +39,23 @@ class MazeRenderer:
         self.show_help = False
         self.help_button_rect = None  # 給 main.py 做滑鼠點擊判定
 
+        # 特效時長以秒為單位換算成幀數，改 FPS 時不會讓動畫變快或變慢
+        self._fx_frames = self._frames(0.45)
+        self._flash_frames = self._frames(0.35)
+        self._pulse_frames = self._frames(0.35)
+        self._banner_frames = self._frames(2.2)
+
         # 視覺回饋狀態
         self.effects = []  # [{r, c, ttl, ttl0, color}]
         self.hit_flash = 0  # 受擊紅閃剩餘幀數
-        self.banner = None  # {text, color, ttl}
+        self.banner = None  # {text, color, ttl, ttl0}
         self.ai_pulse = 0  # AI 行動指示燈亮度
         self._last_action_seen = None
         self._player_px = None  # 玩家平滑移動的目前繪製座標
         self._trail = []  # 玩家移動殘影 [(x, y)]
+
+    def _frames(self, seconds):
+        return max(1, int(self.fps * seconds))
 
     def init_window(self):
         if self.window is not None:
@@ -60,15 +78,16 @@ class MazeRenderer:
     def add_effect(self, kind, r=0, c=0):
         """在格子 (r, c) 加入一個擴散光圈特效；kind='hit' 則為全畫面紅閃"""
         if kind == "hit":
-            self.hit_flash = 8
+            self.hit_flash = self._flash_frames
             return
+        ttl = self._fx_frames
         self.effects.append(
-            {"r": r, "c": c, "ttl": 14, "ttl0": 14, "color": FX_COLORS.get(kind, (255, 255, 255))}
+            {"r": r, "c": c, "ttl": ttl, "ttl0": ttl, "color": FX_COLORS.get(kind, (255, 255, 255))}
         )
 
     def set_banner(self, text, color):
         """顯示回合結束橫幅，會自動淡出"""
-        self.banner = {"text": text, "color": color, "ttl": 70}
+        self.banner = {"text": text, "color": color, "ttl": self._banner_frames, "ttl0": self._banner_frames}
 
     # ------------------------------------------------------------------
     # 主渲染
@@ -163,11 +182,15 @@ class MazeRenderer:
         center = (self._player_px[0], self._player_px[1])
         radius = cell / 2 - 4
 
-        # 移動殘影 (只在移動時累積)
-        if not self._trail or (abs(center[0] - self._trail[-1][0]) + abs(center[1] - self._trail[-1][1])) > 1.5:
-            self._trail.append(tuple(center))
-            if len(self._trail) > 8:
-                self._trail.pop(0)
+        # 移動殘影：移動時累積，停下後逐幀排空 (否則殘影會永遠留在原地)
+        moving = abs(dx) + abs(dy) > 0.5
+        if moving:
+            if not self._trail or (abs(center[0] - self._trail[-1][0]) + abs(center[1] - self._trail[-1][1])) > 1.5:
+                self._trail.append(tuple(center))
+                if len(self._trail) > 8:
+                    self._trail.pop(0)
+        elif self._trail:
+            self._trail.pop(0)
         if len(self._trail) > 1:
             ghost = pygame.Surface((self.window_size, self.total_height), pygame.SRCALPHA)
             n = len(self._trail)
@@ -234,7 +257,7 @@ class MazeRenderer:
         self.effects = [e for e in self.effects if e["ttl"] > 0]
 
         if self.hit_flash > 0:
-            alpha = int(110 * self.hit_flash / 8)
+            alpha = int(110 * self.hit_flash / self._flash_frames)
             pygame.draw.rect(
                 overlay, (231, 76, 60, alpha),
                 pygame.Rect(0, oy, self.window_size, self.window_size), 12,
@@ -249,8 +272,8 @@ class MazeRenderer:
         # AI 行動指示燈：動作改變時閃亮
         if last_ai_action != self._last_action_seen:
             self._last_action_seen = last_ai_action
-            self.ai_pulse = 12
-        pulse = self.ai_pulse / 12
+            self.ai_pulse = self._pulse_frames
+        pulse = self.ai_pulse / self._pulse_frames
         self.ai_pulse = max(0, self.ai_pulse - 1)
         glow = (int(155 + 100 * pulse), int(89 + 100 * pulse), int(182 + 60 * pulse))
         pygame.draw.circle(canvas, glow, (20, self.top_height // 2), 6 + int(3 * pulse))
@@ -318,7 +341,7 @@ class MazeRenderer:
     def _draw_banner(self, canvas, oy):
         if not self.banner:
             return
-        t = self.banner["ttl"] / 70
+        t = self.banner["ttl"] / self.banner["ttl0"]
         alpha = int(230 * min(1.0, t * 3))  # 最後 1/3 淡出
 
         text = self.font_big.render(self.banner["text"], True, (255, 255, 255))

@@ -320,12 +320,14 @@ class MazeEnv(gym.Env):
 
         if target_cell != config.ID_WALL:
             moved = True
-        elif target_cell == config.ID_WALL and self.player_hammers > 0:
+        elif self.player_hammers > 0:
             self.player_hammers -= 1
             self.maze[new_x, new_y] = config.ID_EMPTY
             self._fx("hammer", new_x, new_y)
             moved = True
             print(f"使用了破牆工具！剩餘次數: {self.player_hammers}")
+        else:
+            self._fx("bump", new_x, new_y)  # 撞牆且無鎚可用，至少給個視覺回饋
 
         if moved:
             self.current_time += 1

@@ -22,13 +22,26 @@ def resource_path(relative_path):
 
 # ---------------------------
 
+# 方向鍵 -> (dx, dy)。dx 是列 (往下為正)，dy 是行
+MOVE_KEYS = {
+    pygame.K_UP: (-1, 0),
+    pygame.K_DOWN: (1, 0),
+    pygame.K_LEFT: (0, -1),
+    pygame.K_RIGHT: (0, 1),
+}
+
 if __name__ == "__main__":
+    # Windows 主控台預設不是 UTF-8，把中文輸出導成 UTF-8 避免 UnicodeEncodeError
+    # (PyInstaller 的 windowed 模式下 stdout 是 None)
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     # 建立環境，開啟人眼渲染模式
     env = MazeEnv(render_mode="human")  # 使用 MazeEnv 類別
     obs, info = env.reset()
 
     # 按住方向鍵可連續移動 (手感)
-    pygame.key.set_repeat(180, 110)
+    pygame.key.set_repeat(170, 90)
 
     print("載入模型中...")
     try:
@@ -52,10 +65,11 @@ if __name__ == "__main__":
 
     running = True
     paused = False
+    move_queue = []  # 方向鍵緩衝，快速連按時不會被同一幀的後一個按鍵蓋掉
+    next_ai_step = time.monotonic()
 
     while running:
         step_this_frame = False
-        human_input_received = False  # 標記本幀是否有玩家輸入
 
         # 處理 Pygame 關閉視窗事件與按鍵輸入
         for event in pygame.event.get():
@@ -85,35 +99,31 @@ if __name__ == "__main__":
 
                 # --- 新增：手動操作監聽 ---
                 # 只有在 HUMAN 模式且沒有暫停時才接收移動指令
-                if config.PLAYER_MODE == "HUMAN" and not paused:
-                    move_x, move_y = 0, 0
-                    if event.key == pygame.K_UP:
-                        move_x = -1
-                    elif event.key == pygame.K_DOWN:
-                        move_x = 1
-                    elif event.key == pygame.K_LEFT:
-                        move_y = -1
-                    elif event.key == pygame.K_RIGHT:
-                        move_y = 1
-
-                    if move_x != 0 or move_y != 0:
-                        env.set_player_move(move_x, move_y)
-                        human_input_received = True
+                if config.PLAYER_MODE == "HUMAN" and not paused and event.key in MOVE_KEYS:
+                    if len(move_queue) < 2:  # 最多緩衝兩步，避免放開按鍵後角色還在跑
+                        move_queue.append(MOVE_KEYS[event.key])
                 # ------------------------
 
         # 決定是否執行環境更新 (說明面板開啟時遊戲暫停)
         should_step = False
 
         if env.renderer.show_help:
-            pass
+            move_queue.clear()
         elif config.PLAYER_MODE == "HUMAN":
-            # 手動模式：只有在收到輸入 (或暫停時的單步除錯) 時才執行
-            if human_input_received or (paused and step_this_frame):
+            # 手動模式：收到輸入就立刻走一步 (或暫停時的單步除錯)
+            if move_queue and not paused:
+                env.set_player_move(*move_queue.pop(0))
+                should_step = True
+            elif paused and step_this_frame:
                 should_step = True
         else:
-            # AI 模式：非暫停狀態，或觸發單步執行
-            if not paused or step_this_frame:
+            # AI 模式：用時鐘控制推進速度，與畫面更新率脫鉤
+            now = time.monotonic()
+            if step_this_frame:
                 should_step = True
+            elif not paused and now >= next_ai_step:
+                should_step = True
+                next_ai_step = now + 1.0 / config.AI_STEP_FPS
 
         # 只有在需要執行時才呼叫 env.step
         if should_step:
@@ -126,12 +136,8 @@ if __name__ == "__main__":
                 # 修改：MazeEnv 的 action_space 是 MultiDiscrete，直接使用 sample() 產生合法動作
                 action = env.action_space.sample()
 
-            # 執行一步
+            # 執行一步 (env.step 內部會渲染一幀)
             obs, reward, terminated, truncated, info = env.step(action)
-
-            # 稍微延遲一下，不然人類眼睛跟不上 AI 的速度
-            # 訓練時不需要這個，但展示時需要
-            # time.sleep(0.1)
 
             if terminated:
                 reason = info.get("result", "未知")
@@ -144,11 +150,11 @@ if __name__ == "__main__":
                     "timeout": "超時",
                 }
                 print(f"回合結束 -> {reason_map.get(reason, reason)}")
+                move_queue.clear()
                 obs, info = env.reset()
         else:
-            # 暫停或等待輸入時持續渲染畫面，避免視窗卡死
+            # 沒有推進遊戲時照樣每幀渲染：讓平滑移動、特效繼續播，
+            # 也讓事件輪詢維持在 config.FPS (clock.tick 在 render 裡負責節流)
             env.render()
-            # 降低 CPU 使用率
-            time.sleep(0.05)
 
     env.close()
