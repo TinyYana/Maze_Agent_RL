@@ -425,8 +425,10 @@ RL 最難除錯的問題是「AI 到底看到了什麼」。本專案在訓練�
 - **遊戲內教學**:`?` 按鈕 / H 鍵開啟中文說明面板,內容涵蓋 RL 目標說明。
 - **視覺回饋**:AI 每種編輯動作有對應顏色的擴散光圈、受擊紅閃、
   回合結束橫幅、玩家移動平滑插值與殘影、出口脈動光暈。
-- 深色主題;中文字型依平台自動挑選(Windows 微軟正黑體 / macOS Hiragino
-  Sans GB 等 / Linux Noto Sans CJK),避免預設字體缺字變成豆腐框。
+- 深色主題;中文字型依平台直接指定字型檔路徑載入(Windows 微軟正黑體 /
+  macOS Hiragino Sans GB / Linux Noto Sans CJK),避免預設字體缺字變成豆腐框。
+  不用 `pygame.font.SysFont` 是因為它在 Windows 會掃描字型登錄檔,
+  遇到非字串的登錄值會拋 TypeError,打包成 exe 後一開就閃退。
 - 畫面固定 60 FPS 更新,事件輪詢與 AI 推進速度(`AI_STEP_FPS`)脫鉤,
   確保 HUMAN 模式按下方向鍵能立即得到反饋。
 

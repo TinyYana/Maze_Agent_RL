@@ -8,14 +8,19 @@
 以及操作手感的兩個前提：
 - HUMAN 模式下按鍵當下那一個 step 就會移動玩家
 - 渲染迴圈跑在 config.FPS，不會被額外的 sleep 拖慢事件輪詢
+
+還有字型載入：本機找得到中文字型檔，且 SysFont 爆掉時不會連帶讓遊戲開不起來。
 """
 import os
+import sys
 import time
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
 import numpy as np
+import pygame
 import config
+import envs.rendering as rendering
 from envs.maze_env import MazeEnv
 
 config.PLAYER_MODE = "AI"
@@ -63,5 +68,29 @@ elapsed = time.perf_counter() - start_t
 expected = frames / config.FPS
 assert elapsed < expected * 2.0, f"渲染迴圈太慢：{elapsed:.2f}s，預期約 {expected:.2f}s"
 
+# --- 字型：本機找得到中文字型檔 ---
+candidates = rendering.FONT_FILES.get(sys.platform, rendering.LINUX_FONT_FILES)
+found = [p for p in candidates if os.path.exists(p)]
+assert found, f"{sys.platform} 上找不到任何中文字型檔：{candidates}"
+
+
+# pygame 2.6.1 的 initsysfonts_win32() 會在某些 Windows 上拋 TypeError，
+# 讓 SysFont 整個不能用 (打包成 exe 後就是一開就閃退)。模擬這個情況。
+def _boom(*args, **kwargs):
+    raise TypeError("模擬 initsysfonts_win32 掃字型登錄檔爆炸")
+
+
+original_sysfont = pygame.font.SysFont
+pygame.font.SysFont = _boom
+try:
+    # 有字型檔可用時，根本不該走到 SysFont
+    assert rendering.load_cjk_font(16) is not None, "有中文字型檔時仍去呼叫了 SysFont"
+    # 連字型檔都找不到時，最差也只能退回內建字型，不能讓遊戲開不起來
+    rendering.FONT_FILES[sys.platform] = ["/does/not/exist.ttc"]
+    assert rendering.load_cjk_font(16) is not None, "SysFont 失敗時沒有退回內建字型"
+finally:
+    pygame.font.SysFont = original_sysfont
+    rendering.FONT_FILES[sys.platform] = candidates
+
 env.close()
-print(f"OK ({episodes} 回合，{frames} 幀耗時 {elapsed:.2f}s / 預期 {expected:.2f}s)")
+print(f"OK ({episodes} 回合，{frames} 幀耗時 {elapsed:.2f}s / 預期 {expected:.2f}s，字型 {found[0]})")

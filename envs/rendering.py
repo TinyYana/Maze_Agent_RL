@@ -1,18 +1,58 @@
 import math
+import os
+import sys
 
 import pygame
 import config
 
-# 中文字型候選：三個平台的內建字型都列出來，SysFont 會挑第一個系統裡找得到的。
-# 順序決定優先權，最後的 Arial 只是 ASCII 保底 (它沒有中文字符，會顯示成豆腐框)。
-FONT_NAMES = ",".join(
-    [
-        "Microsoft JhengHei UI", "Microsoft JhengHei", "Microsoft YaHei",  # Windows
-        "PingFang TC", "Heiti TC", "Hiragino Sans GB", "Arial Unicode MS", "STHeiti",  # macOS
-        "Noto Sans CJK TC", "Noto Sans TC", "WenQuanYi Micro Hei",  # Linux
-        "Arial",
-    ]
-)
+# 中文字型直接指定檔案路徑，不走 pygame.font.SysFont：
+# SysFont 在 Windows 會呼叫 initsysfonts_win32() 掃描字型登錄檔，
+# 一旦 Fonts 這個 key 底下出現非字串的值 (例如 REG_DWORD)，
+# pygame 2.6.1 會把 int 丟給 os.path.splitext() 直接拋 TypeError。
+# 指定路徑同時也讓兩個平台的字型選擇是確定的。
+_WINDIR = os.environ.get("WINDIR", "C:\\Windows")
+FONT_FILES = {
+    "win32": [
+        os.path.join(_WINDIR, "Fonts", "msjh.ttc"),  # 微軟正黑體
+        os.path.join(_WINDIR, "Fonts", "msjh.ttf"),
+        os.path.join(_WINDIR, "Fonts", "msyh.ttc"),  # 微軟雅黑
+        os.path.join(_WINDIR, "Fonts", "mingliu.ttc"),  # 細明體
+        os.path.join(_WINDIR, "Fonts", "simsun.ttc"),
+    ],
+    "darwin": [
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/STHeiti Medium.ttc",
+        "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    ],
+}
+LINUX_FONT_FILES = [
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJKtc-Regular.otf",
+    "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+    "/usr/share/fonts/truetype/arphic/uming.ttc",
+]
+
+# 找不到上面任何一個檔案時才用得到的字型名稱 (SysFont 走登錄檔/字型目錄掃描)
+FONT_NAMES = "Microsoft JhengHei,Microsoft YaHei,Hiragino Sans GB,Noto Sans CJK TC"
+
+
+def load_cjk_font(size, bold=False):
+    """依序嘗試各平台的中文字型檔，全部失敗才退回 pygame 內建字型 (不會崩潰，但中文變豆腐框)"""
+    for path in FONT_FILES.get(sys.platform, LINUX_FONT_FILES):
+        if not os.path.exists(path):
+            continue
+        try:
+            font = pygame.font.Font(path, size)
+        except OSError:
+            continue  # 字型檔存在但載入失敗 (損毀或格式不支援)
+        font.set_bold(bold)
+        return font
+
+    try:
+        return pygame.font.SysFont(FONT_NAMES, size, bold=bold)
+    except Exception:  # noqa: BLE001 - SysFont 在某些 Windows 環境會掃登錄檔掃到炸
+        return pygame.font.Font(None, size)
 
 # 特效顏色 (依 AI 動作類型)
 FX_COLORS = {
@@ -66,9 +106,9 @@ class MazeRenderer:
 
         self.total_height = self.top_height + self.window_size + self.ui_height
         self.window = pygame.display.set_mode((self.window_size, self.total_height))
-        self.font = pygame.font.SysFont(FONT_NAMES, 17)
-        self.font_small = pygame.font.SysFont(FONT_NAMES, 14)
-        self.font_big = pygame.font.SysFont(FONT_NAMES, 30, bold=True)
+        self.font = load_cjk_font(17)
+        self.font_small = load_cjk_font(14)
+        self.font_big = load_cjk_font(30, bold=True)
         self.clock = pygame.time.Clock()
 
     # ------------------------------------------------------------------
