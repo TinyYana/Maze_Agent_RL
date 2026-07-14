@@ -129,6 +129,10 @@ class PlayerEnvV2(_AdversarialBase):
     def action_masks(self):
         return player_action_masks(self.game)
 
+    def master_io(self):
+        """外部批次推論模式：回傳凍結 Master 此刻的 (觀測, 遮罩)"""
+        return build_obs(self.game), master_action_masks(self.game)
+
     def _exit_distance(self):
         path = astar_path(self.game.maze, self.game.player_pos, self.game.exit_pos)
         return len(path) - 1 if path else None
@@ -142,8 +146,13 @@ class PlayerEnvV2(_AdversarialBase):
         return build_obs(self.game), {}
 
     def step(self, action):
-        # 1. 凍結 Master 先編輯 (它看的是玩家行動前的局面)
-        if self.master is not None:
+        # 1. 凍結 Master 先編輯 (它看的是玩家行動前的局面)。
+        #    外部批次模式 (BatchedFrozenOpponent) 會把動作打包成 [master_act, player_act]，
+        #    Master 動作已在主進程算好；否則用 env 內建的凍結模型逐筆推論。
+        if np.ndim(action) > 0:
+            m_act, action = int(action[0]), int(action[1])
+            self.game._execute_maze_master_actions(decode_master_action(m_act))
+        elif self.master is not None:
             m_obs, m_mask = build_obs(self.game), master_action_masks(self.game)
             m_act, _ = self.master.predict(m_obs, action_masks=m_mask, deterministic=False)
             self.game._execute_maze_master_actions(decode_master_action(m_act))
@@ -188,9 +197,10 @@ class MasterEnv(_AdversarialBase):
     """Master 視角：agent 是 Maze Master，對手玩家凍結。
 
     opponent:
-      ("astar", None)  A* bot (帶隨機個性，同原版 train.py)
-      ("v2", path)     MaskablePPO 玩家 (本框架訓練的)
-      ("nn4", path)    v1 的 4 通道 PPO 玩家 (速通版舊模型)
+      ("astar", None)     A* bot (帶隨機個性，同原版 train.py)
+      ("v2", path)        MaskablePPO 玩家 (本框架訓練的)
+      ("nn4", path)       v1 的 4 通道 PPO 玩家 (速通版舊模型)
+      ("external", None)  對手動作由 BatchedFrozenOpponent 在主進程批次算好餵入
     """
 
     def __init__(self, opponent=("astar", None), render_mode=None):
@@ -198,6 +208,8 @@ class MasterEnv(_AdversarialBase):
         self.action_space = spaces.Discrete(N_EDIT_TYPES * 225)
         self.opp_kind, opp_path = opponent
         self.opp_model = None
+        self._edit_done = False  # 外部模式：本回合的 Master 編輯是否已由 apply_edit 套用
+        self._blocked_try = False
         if self.opp_kind == "v2":
             from sb3_contrib import MaskablePPO
 
@@ -215,7 +227,20 @@ class MasterEnv(_AdversarialBase):
         super().reset(seed=seed)
         self.game.reset(seed=seed)
         self.episode_steps = 0
+        self._edit_done = False
         return build_obs(self.game), {}
+
+    def apply_edit(self, action):
+        """外部批次模式的前半步：先套用 Master 編輯，回傳對手玩家的 (觀測, 遮罩)。
+
+        時序與內建模式完全一致：對手看到的是編輯後的局面 S'。
+        後半步由 step(對手動作) 完成。
+        """
+        self.game.last_ai_action = ""
+        self.game._execute_maze_master_actions(decode_master_action(action))
+        self._blocked_try = "撤銷" in self.game.last_ai_action
+        self._edit_done = True
+        return build_obs(self.game), player_action_masks(self.game)
 
     def _opponent_move(self):
         """對手玩家在 Master 編輯後的局面上走一步"""
@@ -232,13 +257,20 @@ class MasterEnv(_AdversarialBase):
         return self.game._handle_player_turn()
 
     def step(self, action):
-        # 1. Master 編輯 (先清空訊息，避免上一步的「撤銷」殘留造成誤判)
-        self.game.last_ai_action = ""
-        self.game._execute_maze_master_actions(decode_master_action(action))
-        blocked_try = "撤銷" in self.game.last_ai_action
+        if self._edit_done:
+            # 外部批次模式後半步：編輯已由 apply_edit 套用，action 是對手玩家的移動
+            self._edit_done = False
+            blocked_try = self._blocked_try
+            self.game.set_player_move(*ACTION_TO_MOVE[int(action)])
+            _, player_done, player_info = self.game._handle_player_turn()
+        else:
+            # 1. Master 編輯 (先清空訊息，避免上一步的「撤銷」殘留造成誤判)
+            self.game.last_ai_action = ""
+            self.game._execute_maze_master_actions(decode_master_action(action))
+            blocked_try = "撤銷" in self.game.last_ai_action
 
-        # 2. 對手玩家行動 -> 3. 怪物/碰撞/判定
-        _, player_done, player_info = self._opponent_move()
+            # 2. 對手玩家行動 -> 3. 怪物/碰撞/判定
+            _, player_done, player_info = self._opponent_move()
         terminated, info, _ = self._finish_turn()
         terminated = terminated or player_done
         if player_info:

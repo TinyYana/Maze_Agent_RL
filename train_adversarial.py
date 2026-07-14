@@ -21,6 +21,7 @@ import os
 import random
 
 import numpy as np
+import torch
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import SubprocVecEnv
@@ -28,6 +29,13 @@ from stable_baselines3.common.vec_env import SubprocVecEnv
 import config
 from agents.planner_policy import MasterPolicy, PlayerFeaturesV2
 from envs.adversarial import PlayerEnvV2, MasterEnv
+from envs.batched_opponent import BatchedFrozenOpponent
+
+if torch.cuda.is_available():
+    # ConvGRU 全是卷積且輸入形狀固定：TF32 + cudnn autotune 是免費加速
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
 
 OUT = os.getenv("ADV_OUT", "./models_adv")
 N_ENVS = int(os.getenv("N_ENVS", str(max(min(12, (os.cpu_count() or 8) - 2), 2))))
@@ -40,6 +48,10 @@ POOL_SIZE = 5
 # spawn 最穩：forkserver/fork 會與 torch 的執行緒狀態衝突死鎖 (新 pod 實測卡死)
 START_METHOD = os.getenv("SUBPROC_START", "spawn")
 LEGACY_PLAYER = "player_ppo"  # v1 速通模型，當 Master 預熱對手
+# 凍結對手收到主進程批次推論 (GPU)，worker 只跑遊戲邏輯；BATCH_OPP=0 退回 env 內逐筆 CPU
+BATCH_OPP = os.getenv("BATCH_OPP", "1") == "1"
+# 玩家對抗輪次中保留的靜態迷宮 (無 Master) 環境比例，防災難性遺忘
+STATIC_FRAC = float(os.getenv("STATIC_FRAC", "0.25"))
 
 
 def ppo_kwargs():
@@ -67,29 +79,54 @@ def _limit_worker_threads():
     torch.set_num_threads(1)
 
 
-def make_player_env(rank, master_pool):
+def make_player_env(rank, master_path):
     def _init():
         _limit_worker_threads()
         config.PLAYER_MODE = "NN"
-        path = random.Random(rank).choice(master_pool) if master_pool else None
-        env = PlayerEnvV2(master_model_path=path, randomize_hammers=True)
+        env = PlayerEnvV2(master_model_path=master_path, randomize_hammers=True)
         env.game.rng = np.random.default_rng(42000 + rank)
         return Monitor(env)
 
     return _init
 
 
-def make_master_env(rank, opponent_pool):
+def player_vecenv(master_pool):
+    """玩家側向量環境。BATCH_OPP 時凍結 Master 由主進程批次推論 (GPU)。
+
+    保留 STATIC_FRAC 比例的 env 不放 Master：對抗輪次全是 Master 環境時，
+    導航基本功會被災難性遺忘 (交叉評估實測 player_r4 在無 Master 的靜態
+    迷宮 0/20 全超時，見 docs/ADVERSARIAL_REVIEW.md)。
+    """
+    n_static = int(N_ENVS * STATIC_FRAC) if master_pool else N_ENVS
+    paths = [None if i < n_static else random.Random(i).choice(master_pool) for i in range(N_ENVS)]
+    worker_paths = [None] * N_ENVS if BATCH_OPP else paths
+    env = SubprocVecEnv([make_player_env(i, worker_paths[i]) for i in range(N_ENVS)], start_method=START_METHOD)
+    if BATCH_OPP and master_pool:
+        env = BatchedFrozenOpponent(env, paths, "master", device=DEVICE)
+    return env
+
+
+def make_master_env(rank, opp):
     def _init():
         _limit_worker_threads()
         config.PLAYER_MODE = "NN"
         config.PLAYER_PROFILE_RANDOMIZE = True  # astar 對手時隨機化個性
-        opp = random.Random(rank).choice(opponent_pool)
         env = MasterEnv(opponent=opp)
         env.game.rng = np.random.default_rng(43000 + rank)
         return Monitor(env)
 
     return _init
+
+
+def master_vecenv(opponent_pool):
+    """Master 側向量環境。v2 對手且 BATCH_OPP 時同樣收到主進程批次推論"""
+    opps = [random.Random(i).choice(opponent_pool) for i in range(N_ENVS)]
+    batchable = BATCH_OPP and all(kind == "v2" for kind, _ in opps)
+    worker_opps = [("external", None)] * N_ENVS if batchable else opps
+    env = SubprocVecEnv([make_master_env(i, worker_opps[i]) for i in range(N_ENVS)], start_method=START_METHOD)
+    if batchable:
+        env = BatchedFrozenOpponent(env, [path for _, path in opps], "player", device=DEVICE)
+    return env
 
 
 def evaluate(player_path, master_path, n_episodes=50):
@@ -153,7 +190,7 @@ def main():
     # ---- Phase 1: 玩家預熱 (靜態迷宮) ----
     if not skip_prewarm:
         print(f"=== Phase 1: 玩家預熱 {PREWARM_PLAYER_STEPS} 步 ({N_ENVS} envs) ===")
-        env = SubprocVecEnv([make_player_env(i, []) for i in range(N_ENVS)], start_method=START_METHOD)
+        env = player_vecenv([])
         model = train_side(None, env, "MlpPolicy", player_kwargs, PREWARM_PLAYER_STEPS, "player_prewarm")
         model.save(p0)
         env.close()
@@ -161,7 +198,7 @@ def main():
         # ---- Phase 2: Master 預熱 (對凍結的速通玩家或 A*) ----
         opp = ("nn4", LEGACY_PLAYER) if os.path.exists(LEGACY_PLAYER + ".zip") else ("astar", None)
         print(f"=== Phase 2: Master 預熱 {PREWARM_MASTER_STEPS} 步，對手 {opp[0]} ===")
-        env = SubprocVecEnv([make_master_env(i, [opp]) for i in range(N_ENVS)], start_method=START_METHOD)
+        env = master_vecenv([opp])
         model = train_side(None, env, MasterPolicy, {}, PREWARM_MASTER_STEPS, "master_prewarm")
         model.save(m0)
         env.close()
@@ -176,7 +213,7 @@ def main():
             print(f"=== Round {r}/{N_ROUNDS}: player_r{r} 已存在，跳過 ===")
         else:
             print(f"=== Round {r}/{N_ROUNDS}: 訓練玩家 (對手池 {len(pool_paths('master', r - 1))} 個 Master) ===")
-            env = SubprocVecEnv([make_player_env(i, pool_paths("master", r - 1)) for i in range(N_ENVS)], start_method=START_METHOD)
+            env = player_vecenv(pool_paths("master", r - 1))
             model = train_side(None, env, None, None, ROUND_STEPS, f"player_r{r}",
                                resume_path=os.path.join(OUT, f"player_r{r - 1}"))
             model.save(p_ckpt)
@@ -188,7 +225,7 @@ def main():
         else:
             print(f"=== Round {r}/{N_ROUNDS}: 訓練 Master (對手池 {len(pool_paths('player', r))} 個玩家) ===")
             opp_pool = [("v2", p) for p in pool_paths("player", r)]
-            env = SubprocVecEnv([make_master_env(i, opp_pool) for i in range(N_ENVS)], start_method=START_METHOD)
+            env = master_vecenv(opp_pool)
             model = train_side(None, env, None, None, ROUND_STEPS, f"master_r{r}",
                                resume_path=os.path.join(OUT, f"master_r{r - 1}"))
             model.save(m_ckpt)
