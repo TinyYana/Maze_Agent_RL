@@ -156,6 +156,28 @@ PlayerEnvV2 每步跑兩次 A* 做距離塑形，環境邏輯本身佔比高—�
 批次版在桌機上已超過 3090 pod 原路徑的 88 fps；同樣的改動搬回
 pod 預期還會更快 (worker 不再載 torch 模型，記憶體也省 12×660MB)。
 
+## 心流版重訓 (進行中，2026-07-15 中斷保存)
+
+暖啟動對比實驗：Master 從協作者 master_r4 續訓 (技能保留、新獎勵掰正)，
+玩家從 player_r0 起 (r4 已遺忘導航)。models_adv_flow/ 已有 round 1
+產出 (master_r1/player_r1 + CSV)；round 1 評估：玩家勝率 0%、死亡 26%、
+Master ep_rew 負值 (超時懲罰生效中，行為矯正尚未完成)。
+
+吞吐演進：15 fps (原始) → ~100 (GPU 批次對手) → **448 fps**
+(BFS 距離場 + N_EPOCHS=4 + BATCH_SIZE=2048 + 16 envs)。
+分相計時：採樣僅佔 ~10%，PPO 更新佔 ~90%——更新端旋鈕才是主力。
+
+**續跑** (r0 種子是既有模型的複本，不入 repo)：
+```
+cp models_adv_final/maze_rl/master_r4.zip models_adv_flow/master_r0.zip
+cp models_adv_final/maze_rl/player_r0.zip models_adv_flow/player_r0.zip
+SDL_VIDEODRIVER=dummy SKIP_PREWARM=1 ADV_OUT=./models_adv_flow \
+N_ROUNDS=3 ROUND_STEPS=150000 N_ENVS=16 N_EPOCHS=4 BATCH_SIZE=2048 \
+DEVICE=cuda python -u train_adversarial.py
+```
+完賽後對決三項：player_r3 vs master_r3 (flow rate)、camper vs master_r3
+(必須 0)、player_r3 vs 無 Master (遺忘檢查)，對照協作者版數據。
+
 ## 下一步
 
 1. 三個 P0 一起上 (獎勵 + 混合環境 + 遮罩)，用 GPU 優化後的管線重跑

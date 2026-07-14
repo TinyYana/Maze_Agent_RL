@@ -55,11 +55,14 @@ STATIC_FRAC = float(os.getenv("STATIC_FRAC", "0.25"))
 
 
 def ppo_kwargs():
+    # 分相計時實測：rollout 只佔 ~10% 時間，PPO 更新 (epochs x minibatch
+    # 反向傳播) 佔 ~90%。N_EPOCHS/BATCH_SIZE 是更新端的吞吐旋鈕。
     return dict(
         verbose=1,
         learning_rate=2.5e-4,
-        batch_size=1024,
+        batch_size=int(os.getenv("BATCH_SIZE", "1024")),
         n_steps=max(8192 // N_ENVS, 128),
+        n_epochs=int(os.getenv("N_EPOCHS", "10")),
         ent_coef=0.01,
         gamma=0.99,
         clip_range=0.2,
@@ -155,7 +158,12 @@ def evaluate(player_path, master_path, n_episodes=50):
 def train_side(model_path_or_none, env, policy, policy_kwargs, steps, run_name, resume_path=None):
     """建立或載入模型，訓練 steps 步後回傳模型"""
     if resume_path:
-        model = MaskablePPO.load(resume_path, env=env, device=DEVICE)
+        # 續訓時同樣套用吞吐旋鈕 (載入的舊超參會蓋掉建構參數，需顯式覆寫)
+        kw = ppo_kwargs()
+        model = MaskablePPO.load(
+            resume_path, env=env, device=DEVICE,
+            batch_size=kw["batch_size"], n_epochs=kw["n_epochs"], n_steps=kw["n_steps"],
+        )
     else:
         model = MaskablePPO(policy, env, policy_kwargs=policy_kwargs, **ppo_kwargs())
         n_params = sum(p.numel() for p in model.policy.parameters())
