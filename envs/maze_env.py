@@ -210,10 +210,6 @@ class MazeEnv(gym.Env):
             return self._action_place_monster(x, y)
         return 0
 
-    def _is_path_blocked(self):
-        """檢查當前迷宮是否還有路"""
-        return astar_path(self.maze, self.player_pos, self.exit_pos) is None
-
     def _action_remove(self, x, y):
         self._remove_monster_at(x, y)
         self.maze[x, y] = config.ID_EMPTY
@@ -226,8 +222,15 @@ class MazeEnv(gym.Env):
         old_exit_pos = self.exit_pos.copy()
         self.exit_pos = np.array([x, y], dtype=np.int32)
 
-        if self._is_path_blocked():
+        path = astar_path(self.maze, self.player_pos, self.exit_pos)
+        if path is None:
             self.exit_pos = old_exit_pos  # 撤銷
+            return config.REWARD_BLOCKED
+
+        # 反掛機：出口不能搬到玩家附近，否則玩家可原地來回走等出口送上門
+        if len(path) - 1 < config.EXIT_MIN_PLAYER_DIST:
+            self.exit_pos = old_exit_pos  # 撤銷
+            self.last_ai_action = f"想把出口搬到玩家附近 ({x}, {y}) → 被規則撤銷"
             return config.REWARD_BLOCKED
 
         self._fx("exit", x, y)

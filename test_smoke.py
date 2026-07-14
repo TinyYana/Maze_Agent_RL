@@ -10,6 +10,7 @@
 - 渲染迴圈跑在 config.FPS，不會被額外的 sleep 拖慢事件輪詢
 
 還有字型載入：本機找得到中文字型檔，且 SysFont 爆掉時不會連帶讓遊戲開不起來。
+以及反掛機規則：出口不能被搬到玩家附近。
 """
 import os
 import sys
@@ -93,4 +94,18 @@ finally:
     rendering.FONT_FILES[sys.platform] = candidates
 
 env.close()
+
+# --- 反掛機規則：出口不能被搬到玩家附近（撤銷 + REWARD_BLOCKED） ---
+env = MazeEnv(render_mode=None)
+env.reset(seed=42)
+px, py = env.player_pos
+neighbors = [(px + dx, py + dy) for dx, dy in ((0, 1), (1, 0)) if env.maze[px + dx, py + dy] == config.ID_EMPTY]
+assert neighbors, "玩家起點旁沒有空地？"
+nx, ny = neighbors[0]
+old_exit = env.exit_pos.copy()
+reward = env._action_move_exit(nx, ny)
+assert np.array_equal(env.exit_pos, old_exit), "出口被搬到玩家旁邊了"
+assert reward == config.REWARD_BLOCKED
+env.close()
+
 print(f"OK ({episodes} 回合，{frames} 幀耗時 {elapsed:.2f}s / 預期 {expected:.2f}s，字型 {found[0]})")

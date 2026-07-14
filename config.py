@@ -50,7 +50,11 @@ REWARD_DEATH = -8
 
 REWARD_HIT = 1.0
 REWARD_PATH_EXTEND = 0.5  # 每延長一步的獎勵（累積效果更明顯）
-REWARD_MOVE_EXIT = -0.3
+REWARD_MOVE_EXIT = -1.0  # 搬出口成本調高（防濫用；重訓後才影響策略）
+
+# 反掛機規則：出口新位置與玩家的 A* 路徑步數不得低於此值，
+# 否則撤銷並視同 REWARD_BLOCKED。防止玩家原地來回走、賭 AI 把出口送上門。
+EXIT_MIN_PLAYER_DIST = 8
 
 # === 新增：放牆相關獎勵 ===
 REWARD_BUILD_WALL = 3.0  # 放牆成功基礎獎勵（大幅提高）
