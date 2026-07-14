@@ -79,6 +79,11 @@ class MazeRenderer:
         self.show_help = False
         self.help_button_rect = None  # 給 main.py 做滑鼠點擊判定
 
+        # 疊加層掛鉤：callable(canvas)，在畫面送出前呼叫。
+        # 讓外部 (如 demo_adversarial.py 的版本 HUD) 把內容併進同一幀，
+        # 而不是在 display.update() 之後才補畫 (那會造成閃爍)。
+        self.overlay = None
+
         # 特效時長以秒為單位換算成幀數，改 FPS 時不會讓動畫變快或變慢
         self._fx_frames = self._frames(0.45)
         self._flash_frames = self._frames(0.35)
@@ -182,6 +187,10 @@ class MazeRenderer:
         self._draw_banner(canvas, oy)
         if self.show_help:
             self._draw_help(canvas)
+
+        # 7. 外部疊加層 (與本幀一起送出，避免閃爍)
+        if self.overlay:
+            self.overlay(canvas)
 
         self.window.blit(canvas, (0, 0))
         pygame.event.pump()

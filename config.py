@@ -11,10 +11,14 @@ PLAYER_MAX_HP = 3
 PLAYER_INITIAL_HAMMERS = 2
 ACTIONS_PER_TURN = 1
 K_STEP = 1
-MONSTER_SPEED = 1
+MONSTER_SPEED = 1  # (已棄用，由 MONSTER_MOVE_PATTERN 取代)
+# 怪物移動節奏：每回合依序取值循環，1=走一步 0=不動。
+# (0,1,1) = 「兩回合一步 → 一回合一步」交替，給玩家可學習的逃脫節奏窗
+MONSTER_MOVE_PATTERN = (0, 1, 1)
 MAX_MONSTERS = 3
 
-PLAYER_MODE = "HUMAN"
+# "AI" = A* Bot / "HUMAN" = 手動遊玩 / "NN" = 神經網路玩家 (player_ppo.zip)
+PLAYER_MODE = "NN"
 
 # --- AI 行為設定 ---
 # 0.0 = 完美 A* (最短路徑)
@@ -56,6 +60,27 @@ REWARD_MOVE_EXIT = -0.3
 REWARD_BUILD_WALL = 3.0  # 放牆成功基礎獎勵（大幅提高）
 REWARD_WALL_NEAR_PATH = 2.0  # 放牆靠近玩家路徑額外獎勵
 REWARD_SKIP_ACTION = -0.1  # 不做任何事的小懲罰（鼓勵行動）
+
+# === NN 玩家獎勵設定 (train_player.py / envs/player_env.py) ===
+# 與 Maze Master 的 REWARD_* 完全獨立：玩家的目標是「盡快通關 + 活著」
+PLAYER_REWARD_GOAL = 10.0  # 抵達出口 (不分快慢，心流區間是 Master 的事)
+PLAYER_REWARD_SPEED_BONUS = 0.1  # 速度紅利：通關時每比超時上限 (TIME_MAX*1.5) 早一步再加的獎勵
+PLAYER_REWARD_DEATH = -5.0  # HP 歸零
+PLAYER_REWARD_TIMEOUT = -2.0  # 超時
+PLAYER_REWARD_STEP = -0.01  # 每步時間壓力
+PLAYER_REWARD_HIT = -1.0  # 每損失 1 HP
+# 注意：不要調重。-0.3 會讓從零訓練的策略「怕牆」不敢進窄走廊，探索直接癱瘓 (實測 0/100)
+PLAYER_REWARD_BUMP = -0.05  # 撞牆且無鎚 (無效動作)
+PLAYER_REWARD_DIST = 0.1  # 距離塑形：A* 距離每縮短 1 格的獎勵
+PLAYER_MAX_EPISODE_STEPS = 300  # 玩家環境的回合步數上限 (防呆截斷)
+
+# === 對抗式訓練：Maze Master 零和獎勵 (train_adversarial.py / envs/adversarial.py) ===
+# Master 的目標是「拖延」不是「殺人」：存活每回合加分 (玩家拖越久 Master 賺越多)，
+# 但殺死玩家或試圖堵死路徑都重罰，維持「可解但難走」的設計哲學
+MASTER_REWARD_PER_TURN = 0.05  # 玩家還沒通關的每一回合
+MASTER_REWARD_PLAYER_DIED = -10.0  # 玩家死亡 (Master 失職)
+MASTER_REWARD_BLOCKED_TRY = -1.0  # 嘗試堵死路徑被規則撤銷
+MASTER_REWARD_TOO_FAST = -5.0  # 玩家在 TIME_MIN 之前就通關 (拖延失敗)
 
 # --- 視覺美化設定 (Visuals) ---
 # 深色科技感主題 (RGB)

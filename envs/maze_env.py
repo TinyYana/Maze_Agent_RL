@@ -32,6 +32,7 @@ class MazeEnv(gym.Env):
         self.exit_pos = np.array([0, 0])
         self.player_steps = 0
         self.player_hammers = 0
+        self.turn_count = 0  # 全域回合計數，驅動怪物移動節奏
 
         # 定義動作空間
         n_actions = config.ACTIONS_PER_TURN
@@ -228,6 +229,7 @@ class MazeEnv(gym.Env):
 
         if self._is_path_blocked():
             self.exit_pos = old_exit_pos  # 撤銷
+            self.last_ai_action = f"想搬出口 ({x}, {y}) → 被規則撤銷"
             return config.REWARD_BLOCKED
 
         self._fx("exit", x, y)
@@ -265,8 +267,9 @@ class MazeEnv(gym.Env):
             )
             return self._move_ai_player(path)
 
-        elif config.PLAYER_MODE == "HUMAN":
-            # 人類操作邏輯...
+        elif config.PLAYER_MODE in ("HUMAN", "NN"):
+            # 人類與 NN 玩家共用同一套移動規則 (撞牆自動耗鎚)，
+            # 差別只在指令來源：鍵盤 vs 神經網路 (經由 set_player_move 餵入)
             return self._move_human_player()
 
         return 0, False, {}
@@ -325,7 +328,8 @@ class MazeEnv(gym.Env):
             self.maze[new_x, new_y] = config.ID_EMPTY
             self._fx("hammer", new_x, new_y)
             moved = True
-            print(f"使用了破牆工具！剩餘次數: {self.player_hammers}")
+            if self.render_mode == "human":
+                print(f"使用了破牆工具！剩餘次數: {self.player_hammers}")
         else:
             self._fx("bump", new_x, new_y)  # 撞牆且無鎚可用，至少給個視覺回饋
 
@@ -365,7 +369,16 @@ class MazeEnv(gym.Env):
     # =========================================================================
 
     def _move_monsters(self):
-        """所有怪物使用 A* 向玩家移動 (maze 只含地形，可直接尋路)"""
+        """所有怪物使用 A* 向玩家移動 (maze 只含地形，可直接尋路)
+
+        移動與否由 MONSTER_MOVE_PATTERN 節奏決定 (見 config)，
+        讓「躲怪」在物理上成為可能。
+        """
+        pattern = config.MONSTER_MOVE_PATTERN
+        if not pattern[self.turn_count % len(pattern)]:
+            self.turn_count += 1
+            return
+        self.turn_count += 1
         new_monster_positions = []
 
         for m_pos in self.monsters:
@@ -481,6 +494,7 @@ class MazeEnv(gym.Env):
             [self.grid_size - 1, self.grid_size - 1], dtype=np.int32
         )
         self.monsters = []
+        self.turn_count = 0
         self.last_ai_action = "等待第一步"
 
         # 玩家個性：固定值 (demo/評估) 或每回合隨機抽樣 (訓練泛化)

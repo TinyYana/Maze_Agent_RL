@@ -5,6 +5,7 @@ import sys  # 新增
 import os  # 新增
 from stable_baselines3 import PPO
 from envs.maze_env import MazeEnv
+from envs.player_env import build_player_obs, ACTION_TO_MOVE
 import config
 
 
@@ -54,6 +55,16 @@ if __name__ == "__main__":
         print("找不到模型檔案 'maze_master_ppo.zip'，將使用隨機動作。")
         print("請先執行 'python train.py' 進行訓練。")
         use_model = False
+
+    # NN 玩家模型 (PLAYER_MODE == "NN" 時操作玩家)
+    player_model = None
+    if config.PLAYER_MODE == "NN":
+        try:
+            player_model = PPO.load(resource_path("player_ppo"))
+            print("NN 玩家模型載入成功！")
+        except FileNotFoundError:
+            print("找不到 'player_ppo.zip'，NN 玩家將隨機亂走。")
+            print("請先執行 'python train_player.py' 進行訓練。")
 
     print("遊戲開始！")
     print("--- 操作說明 ---")
@@ -127,6 +138,16 @@ if __name__ == "__main__":
 
         # 只有在需要執行時才呼叫 env.step
         if should_step:
+            # NN 玩家先決定移動方向，env.step 內會與 Master 編輯一併執行
+            if config.PLAYER_MODE == "NN":
+                if player_model is not None:
+                    p_action, _ = player_model.predict(
+                        build_player_obs(env), deterministic=False
+                    )
+                    env.set_player_move(*ACTION_TO_MOVE[int(p_action)])
+                else:
+                    env.set_player_move(*ACTION_TO_MOVE[int(np.random.randint(4))])
+
             if use_model:
                 # 使用模型預測動作
                 # deterministic=False 讓 AI 保持一點隨機性 (探索)，True 則完全依照最高機率

@@ -40,6 +40,7 @@ pywin32-ctypes==0.2.3
 rich==14.2.0
 setuptools==80.9.0
 six==1.17.0
+sb3-contrib==2.7.0
 stable_baselines3==2.7.0
 sympy==1.14.0
 tensorboard==2.20.0
