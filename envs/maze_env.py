@@ -6,6 +6,7 @@ from agents.astar_bot import astar_path
 
 # 匯入拆分出去的模組
 from envs.maze_generator import MazeGenerator
+from envs.pathfield import UNREACHABLE, dist_field
 from envs.rendering import MazeRenderer
 
 
@@ -33,6 +34,10 @@ class MazeEnv(gym.Env):
         self.player_steps = 0
         self.player_hammers = 0
         self.turn_count = 0  # 全域回合計數，驅動怪物移動節奏
+
+        # BFS 距離場快取 (envs/pathfield.py)：地形版本沒變就重用
+        self.terrain_version = 0
+        self._field_cache = {}
 
         # 定義動作空間
         n_actions = config.ACTIONS_PER_TURN
@@ -141,36 +146,55 @@ class MazeEnv(gym.Env):
         if self.render_mode == "human":
             self.renderer.add_effect(kind, x, y)
 
+    def _terrain_changed(self):
+        """任何牆的增減後呼叫，讓距離場快取失效"""
+        self.terrain_version += 1
+
+    def dist_from(self, target):
+        """到 target 的 BFS 距離場，以 (地形版本, 目標格) 快取"""
+        key = (self.terrain_version, int(target[0]), int(target[1]))
+        field = self._field_cache.get(key)
+        if field is None:
+            if len(self._field_cache) > 8:
+                self._field_cache.clear()
+            field = dist_field(self.maze, target)
+            self._field_cache[key] = field
+        return field
+
     def _action_place_wall(self, x, y):
-        """改進版放牆邏輯：增加更細緻的獎勵"""
-        # 先計算放牆前的路徑
-        old_path = astar_path(self.maze, self.player_pos, self.exit_pos)
-        old_len = len(old_path) if old_path else 0
+        """改進版放牆邏輯：增加更細緻的獎勵 (BFS 距離場版)"""
+        # 放牆前的玩家->出口距離；兩張場都會被快取重用
+        exit_field = self.dist_from(self.exit_pos)
+        player_field = self.dist_from(self.player_pos)
+        px, py = int(self.player_pos[0]), int(self.player_pos[1])
+        old_dist = int(exit_field[px, py])
 
         # 嘗試放牆
         self.maze[x, y] = config.ID_WALL
+        self._terrain_changed()
 
         # 檢查是否堵死
-        new_path = astar_path(self.maze, self.player_pos, self.exit_pos)
-
-        if new_path is None:
+        new_dist = int(self.dist_from(self.exit_pos)[px, py])
+        if new_dist >= UNREACHABLE:
             self.maze[x, y] = config.ID_EMPTY  # 撤銷
+            self._terrain_changed()
             self.last_ai_action = f"想堵死路徑 ({x}, {y}) → 被規則撤銷"
             return config.REWARD_BLOCKED
 
         self._fx("wall", x, y)
         self.last_ai_action = f"蓋牆 ({x}, {y})"
         self.action_counts["wall"] += 1
-        new_len = len(new_path)
         reward = config.REWARD_BUILD_WALL
 
-        # 獎勵放牆後路徑變長
-        if new_len > old_len:
-            path_bonus = (new_len - old_len) * config.REWARD_PATH_EXTEND
+        # 獎勵放牆後路徑變長 (距離語意同舊版 len(path) 差值)
+        had_path = old_dist < UNREACHABLE
+        if had_path and new_dist > old_dist:
+            path_bonus = (new_dist - old_dist) * config.REWARD_PATH_EXTEND
             reward += min(path_bonus, 15.0)  # 設上限避免過度
 
-        # 額外獎勵：牆放在原路徑上（迫使玩家繞路）
-        if old_path and (x, y) in old_path:
+        # 額外獎勵：牆落在原最短路上（迫使玩家繞路）。
+        # d_exit(c) + d_player(c) == d(player,exit) ⇔ c 在某條最短路上
+        if had_path and int(exit_field[x, y]) + int(player_field[x, y]) == old_dist:
             reward += config.REWARD_WALL_NEAR_PATH
 
         return reward
@@ -213,11 +237,13 @@ class MazeEnv(gym.Env):
 
     def _is_path_blocked(self):
         """檢查當前迷宮是否還有路"""
-        return astar_path(self.maze, self.player_pos, self.exit_pos) is None
+        field = self.dist_from(self.exit_pos)
+        return int(field[self.player_pos[0], self.player_pos[1]]) >= UNREACHABLE
 
     def _action_remove(self, x, y):
         self._remove_monster_at(x, y)
         self.maze[x, y] = config.ID_EMPTY
+        self._terrain_changed()
         self._fx("remove", x, y)
         self.last_ai_action = f"清除格子 ({x}, {y})"
         self.action_counts["remove"] += 1
@@ -326,6 +352,7 @@ class MazeEnv(gym.Env):
         elif self.player_hammers > 0:
             self.player_hammers -= 1
             self.maze[new_x, new_y] = config.ID_EMPTY
+            self._terrain_changed()
             self._fx("hammer", new_x, new_y)
             moved = True
             if self.render_mode == "human":
@@ -379,14 +406,22 @@ class MazeEnv(gym.Env):
             self.turn_count += 1
             return
         self.turn_count += 1
-        new_monster_positions = []
+        if not self.monsters:
+            return
 
+        # 一張「到玩家」的 BFS 距離場服務所有怪物：沿距離遞減方向走一步
+        field = self.dist_from(self.player_pos)
+        new_monster_positions = []
         for m_pos in self.monsters:
-            path = astar_path(self.maze, m_pos, self.player_pos)
-            if path and len(path) > 1:
-                new_monster_positions.append(list(path[1]))
-            else:
-                new_monster_positions.append(list(m_pos))
+            d = int(field[m_pos[0], m_pos[1]])
+            step = list(m_pos)
+            if 0 < d < UNREACHABLE:
+                for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                    a, b = m_pos[0] + dx, m_pos[1] + dy
+                    if 0 <= a < self.grid_size and 0 <= b < self.grid_size and field[a, b] == d - 1:
+                        step = [a, b]
+                        break
+            new_monster_positions.append(step)
 
         self.monsters = new_monster_positions
 
@@ -495,6 +530,8 @@ class MazeEnv(gym.Env):
         )
         self.monsters = []
         self.turn_count = 0
+        self.terrain_version = 0
+        self._field_cache = {}
         self.last_ai_action = "等待第一步"
 
         # 玩家個性：固定值 (demo/評估) 或每回合隨機抽樣 (訓練泛化)

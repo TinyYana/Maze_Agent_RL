@@ -119,3 +119,23 @@ for seed in (1, 42, 777):
                     f"出口可以被搬到玩家附近 ({x},{y})，距離 {abs(x - px) + abs(y - py)}"
 env.close()
 print("OK 出口距離遮罩")
+
+# --- BFS 距離場 vs A*：最短距離必須一致 (pathfield 是熱路徑的 A* 替代品) ---
+from agents.astar_bot import astar_path
+from envs.maze_generator import MazeGenerator
+from envs.pathfield import UNREACHABLE, dist_field
+
+rng = np.random.default_rng(3)
+for _ in range(30):
+    maze = MazeGenerator.generate(15, rng)
+    empty = np.argwhere(maze == config.ID_EMPTY)
+    s = empty[rng.integers(len(empty))]
+    t = empty[rng.integers(len(empty))]
+    field = dist_field(maze, t)
+    path = astar_path(maze, s, t)
+    d = int(field[s[0], s[1]])
+    if path is None:
+        assert d >= UNREACHABLE
+    else:
+        assert d == len(path) - 1, f"BFS {d} != A* {len(path) - 1}"
+print("OK BFS 距離場與 A* 一致 (30 組)")

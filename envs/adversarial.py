@@ -16,8 +16,8 @@ from gymnasium import spaces
 import numpy as np
 
 import config
-from agents.astar_bot import astar_path
 from envs.maze_env import MazeEnv
+from envs.pathfield import UNREACHABLE
 
 N_CHANNELS = 8
 N_EDIT_TYPES = 5
@@ -142,8 +142,9 @@ class PlayerEnvV2(_AdversarialBase):
         return build_obs(self.game), master_action_masks(self.game)
 
     def _exit_distance(self):
-        path = astar_path(self.game.maze, self.game.player_pos, self.game.exit_pos)
-        return len(path) - 1 if path else None
+        field = self.game.dist_from(self.game.exit_pos)
+        d = int(field[self.game.player_pos[0], self.game.player_pos[1]])
+        return None if d >= UNREACHABLE else d
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
