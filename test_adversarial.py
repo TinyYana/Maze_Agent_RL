@@ -104,3 +104,18 @@ for i in range(N_STEPS):
 env_a.close()
 env_b.close()
 print(f"OK MasterEnv 外部路徑等價 ({N_STEPS} 步)")
+
+# --- 反掛機遮罩：搬出口的合法格永遠離玩家夠遠 ---
+env = MasterEnv(opponent=("external", None))
+for seed in (1, 42, 777):
+    env.reset(seed=seed)
+    n = env.game.grid_size
+    exit_mask = master_action_masks(env.game).reshape(5, n, n)[3]
+    px, py = env.game.player_pos
+    for x in range(n):
+        for y in range(n):
+            if exit_mask[x, y]:
+                assert abs(x - px) + abs(y - py) >= config.EXIT_MIN_PLAYER_DIST, \
+                    f"出口可以被搬到玩家附近 ({x},{y})，距離 {abs(x - px) + abs(y - py)}"
+env.close()
+print("OK 出口距離遮罩")

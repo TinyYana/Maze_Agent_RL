@@ -72,7 +72,15 @@ def master_action_masks(game: MazeEnv) -> np.ndarray:
     mask[0, 0, 0] = True  # skip
     mask[1] = empty  # 蓋牆
     mask[2] = (wall | monster) & ~protected  # 清除
-    mask[3] = empty  # 搬出口
+    # 搬出口：不得落在玩家附近 (曼哈頓距離 = 路徑距離下界)。
+    # 心流獎勵下 Master 會想把出口送到玩家腳邊收割，掛機漏洞因此復活；
+    # 遮罩層根治，也不浪費探索預算 (對照 main 分支 fix/exit-anti-camping)
+    rows, cols = np.indices((n, n))
+    far_enough = (
+        np.abs(rows - game.player_pos[0]) + np.abs(cols - game.player_pos[1])
+        >= config.EXIT_MIN_PLAYER_DIST
+    )
+    mask[3] = empty & far_enough
     if len(game.monsters) < config.MAX_MONSTERS:
         mask[4] = empty  # 放怪
     return mask.flatten()
@@ -276,18 +284,26 @@ class MasterEnv(_AdversarialBase):
         if player_info:
             info.update(player_info)
 
-        # 4. Master 零和獎勵：拖延得分，殺人/被速通失分
+        # 4. Master 獎勵：節奏導演。心流通關是本職成功；殺人/速通/磨超時都是失職。
+        #    每回合小獎只在心流窗內累積，超過 TIME_MAX 拖延就不再賺分
         reward = 0.0
         if blocked_try:
             reward += config.MASTER_REWARD_BLOCKED_TRY
         if not terminated:
-            reward += config.MASTER_REWARD_PER_TURN
+            if self.game.current_time <= config.TIME_MAX:
+                reward += config.MASTER_REWARD_PER_TURN
         else:
             result = info.get("result")
             if result in ("died", "blocked"):
                 reward += config.MASTER_REWARD_PLAYER_DIED
             elif result == "too_fast":
                 reward += config.MASTER_REWARD_TOO_FAST
+            elif result == "flow_success":
+                reward += config.MASTER_REWARD_FLOW
+            elif result == "too_slow":
+                reward += config.MASTER_REWARD_TOO_SLOW
+            elif result == "timeout":
+                reward += config.MASTER_REWARD_TIMEOUT
 
         truncated = self.episode_steps >= config.PLAYER_MAX_EPISODE_STEPS
         return build_obs(self.game), reward, terminated, truncated, info

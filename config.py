@@ -74,13 +74,23 @@ PLAYER_REWARD_BUMP = -0.05  # 撞牆且無鎚 (無效動作)
 PLAYER_REWARD_DIST = 0.1  # 距離塑形：A* 距離每縮短 1 格的獎勵
 PLAYER_MAX_EPISODE_STEPS = 300  # 玩家環境的回合步數上限 (防呆截斷)
 
-# === 對抗式訓練：Maze Master 零和獎勵 (train_adversarial.py / envs/adversarial.py) ===
-# Master 的目標是「拖延」不是「殺人」：存活每回合加分 (玩家拖越久 Master 賺越多)，
-# 但殺死玩家或試圖堵死路徑都重罰，維持「可解但難走」的設計哲學
-MASTER_REWARD_PER_TURN = 0.05  # 玩家還沒通關的每一回合
+# === 對抗式訓練：Maze Master 獎勵 (train_adversarial.py / envs/adversarial.py) ===
+# Master 是「節奏導演」不是「純拖延者」：終局獎勵以心流區間為中心。
+# 舊版 (純拖延+超時不罰) 會訓練出超時磨王：75% 局超時、57% 決策在搬出口，
+# 見 docs/ADVERSARIAL_REVIEW.md 實驗數據。
+MASTER_REWARD_PER_TURN = 0.05  # 玩家還沒通關的每一回合 (只在 current_time <= TIME_MAX 內累積)
+MASTER_REWARD_FLOW = 10.0  # 玩家在心流區間 (TIME_MIN~TIME_MAX) 通關：Master 的本職成功
+MASTER_REWARD_TIMEOUT = -8.0  # 把玩家磨到超時 = 失職
+MASTER_REWARD_TOO_SLOW = -3.0  # 拖過頭 (通關但超過 TIME_MAX)
 MASTER_REWARD_PLAYER_DIED = -10.0  # 玩家死亡 (Master 失職)
 MASTER_REWARD_BLOCKED_TRY = -1.0  # 嘗試堵死路徑被規則撤銷
-MASTER_REWARD_TOO_FAST = -5.0  # 玩家在 TIME_MIN 之前就通關 (拖延失敗)
+MASTER_REWARD_TOO_FAST = -5.0  # 玩家在 TIME_MIN 之前就通關 (控速失敗)
+
+# 反掛機 (與 main 分支的 fix/exit-anti-camping 同源)：出口新位置與玩家的
+# 曼哈頓距離下限，直接做在 master_action_masks 的遮罩層。
+# 心流獎勵讓 Master 有動機「把出口送到玩家腳邊收割通關」——沒有這條遮罩，
+# 玩家原地來回走等出口送上門的漏洞會復活。
+EXIT_MIN_PLAYER_DIST = 8
 
 # --- 視覺美化設定 (Visuals) ---
 # 深色科技感主題 (RGB)
